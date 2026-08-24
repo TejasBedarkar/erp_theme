@@ -6,8 +6,8 @@ app_email = "asd@ansd.com"
 app_license = "mit"
 
 app_include_css = [
-	"custom_ui.bundle.css"
-	"desk_fix.css"
+	"custom_ui.bundle.css",
+	# "desk_fix.css"
 ]
 
 app_include_js = [
