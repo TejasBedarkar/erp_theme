@@ -1,0 +1,6 @@
+.form-tabs, .form-tabs-list, .nav-tabs {
+    background-color: var(--card-bg, #ffffff) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 99 !important;
+}

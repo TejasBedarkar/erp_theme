@@ -7,6 +7,7 @@ app_license = "mit"
 
 app_include_css = [
 	"custom_ui.bundle.css"
+	"desk_fix.css"
 ]
 
 app_include_js = [
