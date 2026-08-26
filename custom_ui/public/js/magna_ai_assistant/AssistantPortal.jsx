@@ -509,32 +509,53 @@ export default function AssistantPortal({ isOpen, onClose }) {
         resizeMessageInput(messageInputRef.current);
     }, [input, currentChatId]);
 
-    // WebRTC Direct-to-OpenAI voice session hook
-    // Handles: token lifecycle, SDP exchange, tool interception → backend execution
-    const { status: webRtcStatus, transcript: webRtcTranscript, start: startVoice, stop: stopVoice } = useVoiceSession({
-        sessionId: currentChatId || 'default',
-        userId: null,
-        apiBase: API_BASE_URL,
-        onMessage: (text) => {
-            // When AI finishes a voice response, show it in chat
-            if (text && currentChatId) {
-                appendMessage(currentChatId, { sender: 'bot', text, tools: [] });
-            }
-        },
-        onError: (msg, err) => {
-            console.error('[Voice]', msg, err);
-            alert(`Voice error: ${msg}`);
-            setIsListening(false);
-        },
-    });
+    // WebSpeech API implementation for reliable inline dictation
+    const dictationRef = useRef(null);
 
     const handleVoiceInput = () => {
-        if (webRtcStatus === 'active' || webRtcStatus === 'connecting' || webRtcStatus === 'tool_calling') {
-            stopVoice();
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Your browser does not support Speech Recognition for dictation.");
+            return;
+        }
+
+        if (isListening) {
+            if (dictationRef.current) {
+                try { dictationRef.current.stop(); } catch(e){}
+            }
             setIsListening(false);
         } else {
             setIsListening(true);
-            startVoice();
+            const recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = SPEECH_RECOGNITION_LANGUAGE || 'en-US';
+            
+            recognition.onresult = (event) => {
+                let final = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        final += event.results[i][0].transcript;
+                    }
+                }
+                if (final) {
+                    setInput(prev => prev + (prev ? ' ' : '') + final);
+                }
+            };
+            
+            recognition.onerror = (e) => {
+                console.warn("Dictation error:", e.error);
+                if (e.error !== 'no-speech') {
+                    setIsListening(false);
+                }
+            };
+            
+            recognition.onend = () => {
+                setIsListening(false);
+            };
+            
+            dictationRef.current = recognition;
+            try { recognition.start(); } catch(e){}
         }
     };
 
@@ -765,16 +786,34 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
     // ---- Web Speech TTS helpers ----
 
-    // Pick the best available en-IN or en-GB voice from speechSynthesis.
-    // Falls back to any English voice, then the browser default.
     const pickTtsVoice = () => {
         const voices = window.speechSynthesis?.getVoices() || [];
-        return (
-            voices.find(v => v.lang === 'en-IN') ||
-            voices.find(v => v.lang === 'en-GB') ||
-            voices.find(v => v.lang.startsWith('en')) ||
-            null
+        
+        // 1. Prioritize known high-quality Indian voices (macOS, Windows, Chrome OS)
+        let bestVoice = voices.find(v => 
+            v.name.includes('Rishi') || 
+            v.name.includes('Veena') || 
+            v.name.includes('Microsoft Heera') ||
+            v.name.includes('Microsoft Ravi') ||
+            (v.name.includes('Google') && v.lang.includes('IN'))
         );
+        
+        // 2. Fallback to generic en-IN language code
+        if (!bestVoice) {
+            bestVoice = voices.find(v => v.lang === 'en-IN' || v.lang === 'en_IN');
+        }
+        
+        // 3. Fallback to British English (handles Indian names better than US English)
+        if (!bestVoice) {
+            bestVoice = voices.find(v => v.lang === 'en-GB' || v.lang === 'en_GB');
+        }
+        
+        // 4. Any English voice
+        if (!bestVoice) {
+            bestVoice = voices.find(v => v.lang.startsWith('en'));
+        }
+        
+        return bestVoice || null;
     };
 
     // Drain the TTS sentence queue — called after each utterance ends.
@@ -793,12 +832,20 @@ export default function AssistantPortal({ isOpen, onClose }) {
         utterance.pitch = 1.0;
         const voice = pickTtsVoice();
         if (voice) utterance.voice = voice;
+        // Keep utterance in memory to prevent Chrome's garbage collection bug from killing it before onend fires
+        window._activeUtterances = window._activeUtterances || [];
+        window._activeUtterances.push(utterance);
+
         utterance.onstart = () => {
             setVoiceStatus('speaking');
             console.log('[MAGMA VOICE] TTS speaking:', text.slice(0, 80));
         };
-        utterance.onend = () => { drainTtsQueue(); };
+        utterance.onend = () => { 
+            window._activeUtterances = window._activeUtterances.filter(u => u !== utterance);
+            drainTtsQueue(); 
+        };
         utterance.onerror = (e) => {
+            window._activeUtterances = window._activeUtterances.filter(u => u !== utterance);
             console.error('[MAGMA VOICE] TTS error:', e.error);
             drainTtsQueue();
         };
@@ -821,15 +868,14 @@ export default function AssistantPortal({ isOpen, onClose }) {
         setVoiceEvents((events) => [...events.slice(-5), { type, detail: String(detail || '') }]);
     };
 
-    const createVoiceChat = () => {
+    const createVoiceChat = (targetSessionId) => {
         if (voiceChatIdRef.current) return voiceChatIdRef.current;
-        const id = currentChatId || `voice-${Date.now()}`;
         if (!currentChatId) {
-            setChatHistory((prev) => [{ id, title: 'Live voice session', messages: [] }, ...prev]);
-            setCurrentChatId(id);
+            setChatHistory((prev) => [{ id: targetSessionId, title: 'Live voice session', messages: [] }, ...prev]);
+            setCurrentChatId(targetSessionId);
         }
-        voiceChatIdRef.current = id;
-        return id;
+        voiceChatIdRef.current = targetSessionId;
+        return targetSessionId;
     };
 
 
@@ -873,7 +919,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
         if (type === 'partial_transcript') {
             setLiveTranscript(text);
             setVoiceStatus('listening');
-
+            
             // Barge-in: STT heard you speak while TTS is playing!
             if (ttsSpeakingRef.current) {
                 console.log('[MAGMA VOICE] Barge-in via STT interim!');
@@ -979,9 +1025,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             if (speechRecognitionRef.current) {
-                try { speechRecognitionRef.current.stop(); } catch (e) { }
+                try { speechRecognitionRef.current.stop(); } catch(e){}
             }
-
+            
             const recognition = new SpeechRecognition();
             recognition.lang = SPEECH_RECOGNITION_LANGUAGE;
             recognition.continuous = true;
@@ -1014,14 +1060,14 @@ export default function AssistantPortal({ isOpen, onClose }) {
                 }
                 if (final) {
                     const cleanText = getRecognizedText([{ transcript: final, confidence: 1 }]);
-
+                    
                     // Final STT Heuristic: Ignore pure punctuation/noise artifacts (breathing/fans)
                     const isNoiseArtifact = !cleanText || cleanText.trim().length <= 1 || /^[^a-zA-Z0-9]+$/.test(cleanText.trim());
                     if (isNoiseArtifact) {
                         console.log('[MAGMA VOICE] Ignored noise/breathing artifact:', final);
                         return;
                     }
-
+                    
                     if (!voiceSocketRef.current || voiceSocketRef.current.readyState !== WebSocket.OPEN) {
                         console.warn('[MAGMA VOICE] Dropping transcript because WebSocket is not open yet.');
                         return;
@@ -1042,7 +1088,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
                     // 2. handleVoiceEvent adds the NEW user text + NEW bot placeholder to the UI
                     handleVoiceEvent({ type: 'final_transcript', text: cleanText });
-
+                    
                     // 3. Send the transcript to the server (which cleanly cancels the server's old task automatically)
                     voiceSocketRef.current.send(JSON.stringify({ type: 'user_speech', text: cleanText }));
                 }
@@ -1064,7 +1110,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
             recognition.onend = () => {
                 if (voiceModeOpenRef.current && speechRecognitionRef.current) {
-                    try { speechRecognitionRef.current.start(); } catch (e) { console.warn('[MAGMA VOICE] restart failed:', e); }
+                    try { speechRecognitionRef.current.start(); } catch(e) { console.warn('[MAGMA VOICE] restart failed:', e); }
                 }
             };
 
@@ -1072,7 +1118,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
             try {
                 recognition.start();
                 setMicPermission('granted');
-            } catch (e) {
+            } catch(e) {
                 console.warn('[MAGMA VOICE] Synchronous STT start failed:', e);
             }
         } else {
@@ -1085,28 +1131,31 @@ export default function AssistantPortal({ isOpen, onClose }) {
         if (window.speechSynthesis && window.speechSynthesis.getVoices().length === 0) {
             await new Promise(resolve => {
                 window.speechSynthesis.onvoiceschanged = resolve;
-                setTimeout(resolve, 1000);
+                setTimeout(resolve, 1000); 
             });
         }
 
-        const sessionId = voiceSessionIdRef.current || (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        // CRITICAL: Use the same session_id as the current text chat so Voice and
+        // Chat share a single conversation history in the backend DB.
+        // Previously this generated a random UUID which created a completely
+        // separate history thread — context was always lost on Voice↔Chat switches.
+        const chatSessionId = currentChatId || `voice-${Date.now()}`;
+        const sessionId = chatSessionId;
         voiceSessionIdRef.current = sessionId;
-        createVoiceChat();
+        createVoiceChat(sessionId);
 
         const voiceParams = new URLSearchParams({ session_id: sessionId });
-        // const hostUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') || `ws://${window.location.host || 'localhost:8005'}`;
-        const hostUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') || `ws://${window.location.host || 'ai.tjdem.online'}`;
-//         const hostUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') || `ws://${window.location.host || 'mmn2qbq4-8005.inc1.devtunnels.ms'}`;
+        const hostUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') || `ws://${window.location.host || 'localhost:8050'}`;
         const socket = new WebSocket(`${hostUrl}/ws/voice?${voiceParams.toString()}`);
         voiceSocketRef.current = socket;
-
+        
         socket.onopen = () => {
             console.log('[MAGMA VOICE] WebSocket OPEN:', socket.url);
             setVoiceConnected(true);
             setVoiceStatus('listening');
             addVoiceEvent('connected', sessionId);
             if (speechRecognitionRef.current) {
-                try { speechRecognitionRef.current.start(); } catch (e) { console.warn('[MAGMA VOICE] SpeechRecognition.start() failed:', e); }
+                try { speechRecognitionRef.current.start(); } catch(e) { console.warn('[MAGMA VOICE] SpeechRecognition.start() failed:', e); }
             }
         };
 
@@ -1143,14 +1192,14 @@ export default function AssistantPortal({ isOpen, onClose }) {
     const disconnectVoice = () => {
         stopMicAnalyser();
         if (speechRecognitionRef.current) {
-            try { speechRecognitionRef.current.stop(); } catch (e) { }
+            try { speechRecognitionRef.current.stop(); } catch(e){}
             speechRecognitionRef.current = null;
         }
         ttsInterruptedRef.current = true;
         ttsQueueRef.current = [];
         ttsSpeakingRef.current = false;
         window.speechSynthesis?.cancel();
-
+        
         // Clean up any hanging thinking state before disconnecting
         if (voiceChatIdRef.current) {
             updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
@@ -1159,14 +1208,14 @@ export default function AssistantPortal({ isOpen, onClose }) {
                 text: msg.text ? msg.text : '[Turn cancelled]'
             }));
         }
-
+        
         const socket = voiceSocketRef.current;
         voiceSocketRef.current = null;
         if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'User disconnected');
         setVoiceConnected(false);
         setVoiceStatus('idle');
     };
-    const openVoiceMode = () => {
+const openVoiceMode = () => {
         if (voiceModeOpenRef.current) return;
         voiceModeOpenRef.current = true;
         setIsVoiceModeOpen(true);
@@ -1189,7 +1238,6 @@ export default function AssistantPortal({ isOpen, onClose }) {
         setVoiceTools([]);
         setPinnedChart(null);
         disconnectVoice();
-        voiceChatIdRef.current = null;
     };
 
     const handleOrbTap = () => {
@@ -1204,6 +1252,14 @@ export default function AssistantPortal({ isOpen, onClose }) {
     useEffect(() => {
         voiceStatusRef.current = voiceStatus;
     }, [voiceStatus]);
+
+    // Keep voiceDisplayMessages in sync with the underlying text chat
+    // so the floating transcript window populates as the AI responds.
+    useEffect(() => {
+        if (isVoiceModeOpen) {
+            setVoiceDisplayMessages(activeMessages.map((msg) => ({ ...msg })));
+        }
+    }, [activeMessages, isVoiceModeOpen]);
 
     useEffect(() => {
         if (isVoiceModeOpen) {
@@ -1486,7 +1542,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
                         </div>
 
                         {/* Interactive Workspace Area */}
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--card-bg, #ffffff)', position: 'relative' }}>
+                        <div style={{ flex: 1, display: isVoiceModeOpen ? 'none' : 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--card-bg, #ffffff)', position: 'relative' }}>
                             <AnimatePresence mode="wait">
                                 {activeMessages.length === 0 ? (
                                     <motion.div
@@ -1829,28 +1885,10 @@ export default function AssistantPortal({ isOpen, onClose }) {
                                         maskImage: 'linear-gradient(to bottom, transparent 0, black 18px, black 100%)'
                                     }}
                                 >
-                                    {voiceDisplayMessages.map((message, index) => (
-                                        <div
-                                            key={`${message.sender}-${index}`}
-                                            style={{
-                                                alignSelf: message.sender === 'user' ? 'flex-end' : 'flex-start',
-                                                maxWidth: message.sender === 'user' ? '78%' : '88%',
-                                                padding: message.sender === 'user' ? '10px 16px' : '2px 4px',
-                                                borderRadius: message.sender === 'user' ? '22px' : '0',
-                                                backgroundColor: message.sender === 'user'
-                                                    ? 'color-mix(in srgb, var(--text-muted, #64748b) 10%, var(--card-bg, #fff))'
-                                                    : 'transparent',
-                                                color: 'var(--text-color, #0f172a)', fontSize: '14px',
-                                                lineHeight: 1.65, textAlign: 'left'
-                                            }}
-                                        >
-                                            {message.sender === 'bot'
-                                                ? <VoiceReplyText text={message.text || ''} />
-                                                : message.text}
-                                        </div>
-                                    ))}
+                                    {/* The Voice Mode is meant to be a clean, distraction-free interface.
+                                        We only show the CURRENT live user transcript and the CURRENT bot reply. */ }
 
-                                    {liveTranscript && voiceDisplayMessages[voiceDisplayMessages.length - 1]?.text !== liveTranscript && (
+                                    {liveTranscript && (
                                         <motion.div
                                             initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
                                             style={{
@@ -1864,7 +1902,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
                                         </motion.div>
                                     )}
 
-                                    {lastReplyText && voiceDisplayMessages[voiceDisplayMessages.length - 1]?.text !== lastReplyText && (
+                                    {lastReplyText && (
                                         <motion.div
                                             initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
                                             style={{

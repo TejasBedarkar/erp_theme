@@ -1,0 +1,34 @@
+/* .form-tabs, .form-tabs-list, .nav-tabs {
+    background-color: var(--card-bg, #ffffff) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 99 !important;
+} */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Desk Header Scroll & Tab Fix */
+.form-tabs, 
+.form-tabs-list,
+.nav-tabs {
+    background-color: var(--card-bg, #ffffff) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 99 !important;
+}
+
+.page-head {
+    background-color: var(--card-bg, #ffffff) !important;
+    z-index: 100 !important;
+}

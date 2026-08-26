@@ -1,6 +1,7 @@
 /* theming */
 /* wrt worin dir to reso build scss */
 
+@import "../custom_ui/custom_ui/public/css/desk_fix.css";
 /* add */
 @import "../custom_ui/custom_ui/public/theme/variables.css";
 @import "../custom_ui/custom_ui/public/theme/typography.css";
@@ -21,3 +22,33 @@
 /* components */
 @import "../custom_ui/custom_ui/public/components/inputs.css";
 @import "../custom_ui/custom_ui/public/components/cards.css";
+
+
+
+
+
+
+
+/* theming */
+
+/* add */
+/* @import "../theme/variables.css";
+@import "../theme/typography.css";
+@import "../theme/spacing.css";
+@import "../theme/shadows.css";
+@import "../theme/global.css";
+@import "../theme/list_view.css"; */
+
+/* theme */
+/* @import "../theme/themes/dark.css";
+@import "../theme/themes/light.css";
+@import "../theme/themes/blue.css";
+@import "../theme/themes/orange.css";
+@import "../theme/themes/brown.css";
+@import "../theme/themes/peach.css";
+@import "../theme/themes/purple.css";
+@import "../theme/themes/sky.css"; */
+/* 
+components
+@import "../components/inputs.css";
+@import "../components/cards.css"; */
