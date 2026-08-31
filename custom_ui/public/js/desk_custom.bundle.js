@@ -31,50 +31,9 @@ $(document).on('app_ready', function() {
 //     }, 500);
 // });
 
-frappe.router.on("change", () => {
-    setTimeout(() => {
-
-        document.querySelectorAll("body *").forEach(el => {
-            if (el.children.length > 0) return;
-
-            if (el.textContent.includes("ERPNext")) {
-                el.textContent = el.textContent.replace(/ERPNext/g, "MagnaERP");
-            }
-
-            if (el.textContent.includes("Frappe")) {
-                el.textContent = el.textContent.replace(/Frappe/g, "Magna");
-            }
-        });
-
-    }, 300);
-});
-function replaceBranding() {
-
-    const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-    );
-
-    let node;
-
-    while ((node = walker.nextNode())) {
-
-        node.nodeValue = node.nodeValue
-            .replace(/ERPNext/g, "MagnaERP")
-            .replace(/Frappe/g, "Magna");
-    }
-}
-
-frappe.after_ajax(() => {
-    replaceBranding();
-});
-
-frappe.router.on("change", () => {
-    setTimeout(replaceBranding, 300);
-    setTimeout(replaceBranding, 1000);
-});
+// Branding of the framework's own wording now lives in translations/en.csv.
+// Rewriting every text node on the page also rewrote what users typed into
+// fields, which made the stored value impossible to read back.
 
 frappe.ui.form.on("System Settings", {
     refresh(frm) {
