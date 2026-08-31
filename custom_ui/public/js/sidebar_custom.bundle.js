@@ -1,7 +1,5 @@
 $(document).on('app_ready', function() {
-    // Sidebar Header ke texts ko dynamic dhoond kar badalne ke liye Observer
-    const sidebarObserver = new MutationObserver((mutations) => {
-        
+    function replaceSidebarBranding() {
         // Sidebar ke header titles aur text blocks ko target karega
         $('.sidebar-header .app-name, .nested-navigation .sidebar-header-title, .sidebar-header, .sidebar-header-subtitle').each(function() {
             let currentText = $(this).text().trim();
@@ -30,6 +28,21 @@ $(document).on('app_ready', function() {
                 $(this).text(currentText);
             }
         });
+    }
+
+    replaceSidebarBranding();
+    let brandingTimer;
+    const sidebarObserver = new MutationObserver((mutations) => {
+        const sidebarChanged = mutations.some(({ target, addedNodes }) =>
+            target.nodeType === Node.ELEMENT_NODE &&
+            (target.closest?.('.layout-side-section, .nested-navigation, .sidebar-header') ||
+             Array.from(addedNodes).some(node => node.nodeType === Node.ELEMENT_NODE &&
+                 (node.matches?.('.layout-side-section, .nested-navigation, .sidebar-header') ||
+                  node.querySelector?.('.sidebar-header'))))
+        );
+        if (!sidebarChanged) return;
+        clearTimeout(brandingTimer);
+        brandingTimer = setTimeout(replaceSidebarBranding, 80);
     });
 
     // Poore browser screen par dynamic updates track karega
@@ -233,8 +246,18 @@ $(document).on('app_ready', function () {
 
 
     // Sidebar dynamic render
-    const arrowObserver = new MutationObserver(function () {
-        setupCRMArrow();
+    let arrowSetupTimer;
+    const arrowObserver = new MutationObserver(function (mutations) {
+        const sidebarChanged = mutations.some(({ target, addedNodes }) =>
+            target.nodeType === Node.ELEMENT_NODE &&
+            (target.closest?.('.layout-side-section, .nested-navigation, .sidebar-header') ||
+             Array.from(addedNodes).some(node => node.nodeType === Node.ELEMENT_NODE &&
+                 (node.matches?.('.layout-side-section, .nested-navigation, .sidebar-header') ||
+                  node.querySelector?.('.sidebar-header'))))
+        );
+        if (!sidebarChanged) return;
+        clearTimeout(arrowSetupTimer);
+        arrowSetupTimer = setTimeout(setupCRMArrow, 80);
     });
 
     arrowObserver.observe(document.body, {
@@ -284,19 +307,3 @@ $(document).on('click.crmArrowOutside', function (e) {
 
 });
 
-
-// Frappe DOM changes detect करा
-const crmPanelObserver = new MutationObserver(function () {
-
-    setTimeout(function () {
-        resetCRMArrowWhenPanelCloses();
-    }, 50);
-
-});
-
-crmPanelObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['style', 'class']
-});

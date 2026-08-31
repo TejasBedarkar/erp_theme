@@ -1,21 +1,53 @@
-$(document).on('app_ready', function() {
-    // MutationObserver setup jo HTML me badlao par nazar rakhega
-    const observer = new MutationObserver((mutations) => {
-        // Jab bhi naye elements screen par aayenge
-        $('.frappe-menu.context-menu .dropdown-menu-item').each(function() {
-            let itemText = $(this).find('.menu-item-title').text().trim();
-            
-            if (itemText === "About" || itemText === "Frappe Support") {
-                $(this).remove();
-            }
-        });
+// Ace renders editable text into plain divs, so a tag check alone lets the
+// rewrite reach what a user typed - for example the Source Text of a Translation,
+// where the stored value then becomes impossible to read back.
+const EDITABLE_SELECTOR = 'textarea, input, [contenteditable="true"], .ace-editor-target';
+
+function isEditable(node) {
+    return !!node.parentElement?.closest(EDITABLE_SELECTOR);
+}
+
+function replaceBranding(root) {
+    if (!root) return;
+
+    if (root.nodeType === Node.TEXT_NODE) {
+        const parentTag = root.parentElement?.tagName;
+        if (!root.nodeValue || ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parentTag)) return;
+        if (isEditable(root)) return;
+        root.nodeValue = root.nodeValue.replace(/ERPNext/g, 'MagnaERP').replace(/Frappe/g, 'Magna');
+        return;
+    }
+
+    if (root.nodeType !== Node.ELEMENT_NODE || root.matches('script, style, textarea')) return;
+
+    const menuItems = root.matches('.frappe-menu.context-menu .dropdown-menu-item')
+        ? [root]
+        : root.querySelectorAll('.frappe-menu.context-menu .dropdown-menu-item');
+    menuItems.forEach((item) => {
+        const title = item.querySelector('.menu-item-title')?.textContent.trim();
+        if (title === 'About' || title === 'Frappe Support') item.remove();
     });
 
-    // Poore HTML body ko observe karna shuru karega
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+            return ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(node.parentElement?.tagName)
+                ? NodeFilter.FILTER_REJECT
+                : NodeFilter.FILTER_ACCEPT;
+        }
     });
+    let node;
+    while ((node = walker.nextNode())) {
+        if (!node.nodeValue || (!node.nodeValue.includes('ERPNext') && !node.nodeValue.includes('Frappe'))) continue;
+        node.nodeValue = node.nodeValue.replace(/ERPNext/g, 'MagnaERP').replace(/Frappe/g, 'Magna');
+    }
+}
+
+$(document).on('app_ready', function() {
+    replaceBranding(document.body);
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(({ addedNodes }) => addedNodes.forEach(replaceBranding));
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 });
 
 // frappe.router.on("change", () => {
@@ -30,10 +62,6 @@ $(document).on('app_ready', function() {
 //         });
 //     }, 500);
 // });
-
-// Branding of the framework's own wording now lives in translations/en.csv.
-// Rewriting every text node on the page also rewrote what users typed into
-// fields, which made the stored value impossible to read back.
 
 frappe.ui.form.on("System Settings", {
     refresh(frm) {

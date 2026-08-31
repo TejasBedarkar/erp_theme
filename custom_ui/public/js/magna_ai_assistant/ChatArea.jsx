@@ -15,7 +15,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 // with "Failed to fetch". Use "localhost" if the backend runs on the
 // same machine as the browser, or the server's real IP/hostname if not.
 // ============================================================
-const API_BASE_URL = 'https://ai.tjdem.online';
+// const API_BASE_URL = 'https://ai.tjdem.online';
+const API_BASE_URL = 'http://localhost:8050';
+// const API_BASE_URL = 'https://magnaerp.tjdem.online';
 // const API_BASE_URL = 'http://localhost:8005';   // e.g. backend on another machine on your LAN
 // const API_BASE_URL = 'https://mmn2qbq4-8005.inc1.devtunnels.ms';  
 // const API_BASE_URL = 'https://api.yourdomain.com'; // e.g. deployed backend
@@ -51,7 +53,8 @@ function stripMarkdownForSpeech(text) {
         .replace(/`([^`]+)`/g, '$1')                      // inline code
         .replace(/!\[[^\]]*\]\([^)]*\)/g, '')             // images
         .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')          // links -> link text
-        .replace(/^\s*\|.*\|\s*$/gm, '')                  // table rows
+        .replace(/\[Action[^\]]*\]/g, '')                  // action pills like [Action: Run Report]
+        .replace(/^\s*[|+].*\n?/gm, '')                     // ALL table rows and borders (pipes and pluses)
         .replace(/^\s*#{1,6}\s*/gm, '')                   // headings
         .replace(/^\s*[-*]\s+/gm, '')                     // bullet markers
         .replace(/\*\*(.*?)\*\*/g, '$1')                  // bold
@@ -62,14 +65,65 @@ function stripMarkdownForSpeech(text) {
         .trim();
 }
 
-// Calls the backend TTS endpoint and returns a playable data: URL. Reuses
-// the same OpenAI voice (TTS_VOICE, e.g. "alloy") that Live Voice Mode
-// speaks with, so both surfaces sound identical.
+// Streams TTS audio from /api/tts/stream using MediaSource API.
+// Playback starts in ~200ms (first chunk) vs waiting for the full file.
+// Falls back to the old base64 endpoint if MediaSource is unavailable.
+async function streamSpeechAudio(text, onReady, onEnded, onError, cancelRef) {
+    if (!window.MediaSource || !MediaSource.isTypeSupported('audio/mpeg')) {
+        // Fallback: fetch full audio as base64
+        const r = await fetch(`${API_BASE_URL}/api/tts`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+        });
+        if (!r.ok) throw new Error(`TTS failed: ${r.status}`);
+        const d = await r.json();
+        const audio = new Audio(`data:audio/mpeg;base64,${d.audio}`);
+        audio.onended = onEnded;
+        audio.onerror = onError;
+        onReady(audio);
+        return audio;
+    }
+
+    const ms = new MediaSource();
+    const audio = new Audio();
+    audio.src = URL.createObjectURL(ms);
+    audio.onended = onEnded;
+    audio.onerror = onError;
+
+    ms.addEventListener('sourceopen', async () => {
+        let sb;
+        try { sb = ms.addSourceBuffer('audio/mpeg'); } catch { ms.endOfStream(); return; }
+
+        const response = await fetch(`${API_BASE_URL}/api/tts/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+        });
+        if (!response.ok) { ms.endOfStream(); onError(new Error(`TTS stream failed: ${response.status}`)); return; }
+
+        const reader = response.body.getReader();
+        let firstChunk = true;
+
+        const pump = async () => {
+            while (true) {
+                if (cancelRef && cancelRef.cancelled) { reader.cancel(); ms.endOfStream(); return; }
+                const { done, value } = await reader.read();
+                if (done) { if (!sb.updating) ms.endOfStream(); return; }
+                await new Promise(res => { if (sb.updating) sb.addEventListener('updateend', res, { once: true }); else res(); });
+                sb.appendBuffer(value);
+                if (firstChunk) { firstChunk = false; onReady(audio); audio.play().catch(() => { }); }
+                await new Promise(res => sb.addEventListener('updateend', res, { once: true }));
+            }
+        };
+        pump().catch(() => { try { ms.endOfStream(); } catch { } });
+    });
+
+    return audio;
+}
+
+// Kept for backward compat — used in the non-streaming fallback path
 async function fetchSpeechAudio(text) {
     const response = await fetch(`${API_BASE_URL}/api/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
     });
     if (!response.ok) throw new Error(`TTS request failed with status ${response.status}`);
     const data = await response.json();
@@ -147,7 +201,7 @@ function EmbeddedBase64Image({ source, alt }) {
     );
 }
 
-function FormattedMarkdownText({ text, isStreaming = false }) {
+function FormattedMarkdownText({ text, isStreaming = false, onSuggestionClick }) {
     if (!text) return null;
 
     // Some chart tools put a newline between `![alt]` and `(data:image...)`.
@@ -227,6 +281,20 @@ function FormattedMarkdownText({ text, isStreaming = false }) {
             return;
         }
 
+        // Detect Action Pill — accumulate consecutive pills into one group block
+        let stripped = trimmed.replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '');
+        if (stripped.startsWith('[Action:') && stripped.endsWith(']')) {
+            if (currentTable) { blocks.push({ type: 'table', rows: currentTable }); currentTable = null; }
+            const actionText = stripped.slice(8, -1).trim();
+            const last = blocks[blocks.length - 1];
+            if (last && last.type === 'action_pills') {
+                last.pills.push(actionText);
+            } else {
+                blocks.push({ type: 'action_pills', pills: [actionText] });
+            }
+            return;
+        }
+
         // Detect Bullet Points
         if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
             const bulletText = trimmed.substring(2);
@@ -247,6 +315,47 @@ function FormattedMarkdownText({ text, isStreaming = false }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {blocks.map((block, idx) => {
+                if (block.type === 'action_pills') {
+                    return (
+                        <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '10px', alignItems: 'center' }}>
+                            {block.pills.map((pill, pIdx) => (
+                                <button
+                                    key={pIdx}
+                                    onClick={() => onSuggestionClick && onSuggestionClick(pill)}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        padding: '5px 13px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        color: 'var(--primary-color, #6366f1)',
+                                        backgroundColor: 'color-mix(in srgb, var(--primary-color, #6366f1) 10%, transparent)',
+                                        border: '1px solid color-mix(in srgb, var(--primary-color, #6366f1) 28%, transparent)',
+                                        borderRadius: '16px',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.18s ease, border-color 0.18s ease, transform 0.12s ease',
+                                        outline: 'none',
+                                        lineHeight: '1.4'
+                                    }}
+                                    onMouseOver={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary-color, #6366f1) 20%, transparent)';
+                                        e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--primary-color, #6366f1) 50%, transparent)';
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                    }}
+                                    onMouseOut={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary-color, #6366f1) 10%, transparent)';
+                                        e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--primary-color, #6366f1) 28%, transparent)';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
+                                >
+                                    <span style={{ fontSize: '10px', opacity: 0.7 }}>→</span>
+                                    {pill}
+                                </button>
+                            ))}
+                        </div>
+                    );
+                }
                 if (block.type === 'heading') {
                     return (
                         <h4 key={idx} style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-color, #0f172a)', margin: '12px 0 4px 0' }}>
@@ -318,7 +427,7 @@ function FormattedMarkdownText({ text, isStreaming = false }) {
     );
 }
 
-function StreamingText({ text, speed = 6, onComplete }) {
+function StreamingText({ text, speed = 6, onComplete, onSuggestionClick }) {
     const [displayedText, setDisplayedText] = useState('');
     const containsEmbeddedImage = /data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(String(text || ''));
     useEffect(() => {
@@ -347,7 +456,7 @@ function StreamingText({ text, speed = 6, onComplete }) {
         return () => clearInterval(interval);
     }, [text, speed, containsEmbeddedImage]);
 
-    return <FormattedMarkdownText text={displayedText} />;
+    return <FormattedMarkdownText text={displayedText} onSuggestionClick={onSuggestionClick} />;
 }
 
 function getCleanTextAndChart(text) {
@@ -897,7 +1006,7 @@ function ThinkingIndicator() {
     );
 }
 
-export default function ChatArea({ messages = [], isThinking }) {
+export default function ChatArea({ messages = [], isThinking, onSuggestionClick }) {
     const scrollBottomRef = useRef(null);
 
     // Auto-detect thinking state: If last message in list was sent by 'user' OR explicitly passed via isThinking
@@ -938,34 +1047,35 @@ export default function ChatArea({ messages = [], isThinking }) {
         stopSpeaking();
         const requestId = speechRequestIdRef.current;
         setLoadingSpeechIndex(index);
+        const cancelRef = { cancelled: false };
 
         try {
-            const audioSrc = await fetchSpeechAudio(plainText);
-            if (requestId !== speechRequestIdRef.current) return; // superseded/stopped while loading
-
-            const audio = new Audio(audioSrc);
-            currentAudioRef.current = audio;
-            audio.onended = () => {
-                if (currentAudioRef.current === audio) currentAudioRef.current = null;
-                setSpeakingIndex((current) => (current === index ? null : current));
-            };
-            audio.onerror = () => {
-                if (currentAudioRef.current === audio) currentAudioRef.current = null;
-                setSpeakingIndex((current) => (current === index ? null : current));
-                console.error('Text-to-speech playback failed for the received audio.');
-                alert('Could not play the reply audio (the audio data from the server looked invalid). Check the browser console/network tab for details.');
-            };
-            setLoadingSpeechIndex(null);
-            setSpeakingIndex(index);
-            audio.play().catch((playErr) => {
-                setSpeakingIndex((current) => (current === index ? null : current));
-                console.error('Audio playback was blocked or failed:', playErr);
-                alert(`Could not play the reply audio: ${playErr.message || playErr}`);
-            });
+            await streamSpeechAudio(
+                plainText,
+                (audio) => {
+                    // onReady: called as soon as first chunk arrives (~200ms)
+                    if (requestId !== speechRequestIdRef.current) { audio.pause(); cancelRef.cancelled = true; return; }
+                    currentAudioRef.current = audio;
+                    setLoadingSpeechIndex(null);
+                    setSpeakingIndex(index);
+                },
+                () => {
+                    // onEnded
+                    if (currentAudioRef.current) currentAudioRef.current = null;
+                    setSpeakingIndex((current) => (current === index ? null : current));
+                },
+                (err) => {
+                    // onError
+                    console.error('TTS playback error:', err);
+                    setLoadingSpeechIndex(null);
+                    setSpeakingIndex((current) => (current === index ? null : current));
+                },
+                cancelRef,
+            );
         } catch (err) {
             console.error('Text-to-speech failed:', err);
             if (requestId === speechRequestIdRef.current) setLoadingSpeechIndex(null);
-            alert(`Could not read this reply aloud: ${err.message}. Check that the backend server is running the latest server.py (with the /api/tts route) and is reachable at ${API_BASE_URL}.`);
+            alert(`Could not read this reply aloud: ${err.message}`);
         }
     };
 
@@ -1085,7 +1195,7 @@ export default function ChatArea({ messages = [], isThinking }) {
                                                 title={
                                                     speakingIndex === index ? 'Stop reading'
                                                         : loadingSpeechIndex === index ? 'Loading audio…'
-                                                        : 'Read this reply aloud'
+                                                            : 'Read this reply aloud'
                                                 }
                                                 style={{
                                                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -1129,9 +1239,9 @@ export default function ChatArea({ messages = [], isThinking }) {
                                             {!isUser && msg.streaming && !cleanText && (!msg.tools || msg.tools.length === 0) ? (
                                                 <LiveThinkingDots />
                                             ) : !isUser && isLast && !msg.streamed ? (
-                                                <StreamingText text={cleanText} />
+                                                <StreamingText text={cleanText} onSuggestionClick={onSuggestionClick} />
                                             ) : (
-                                                <FormattedMarkdownText text={cleanText} isStreaming={!!msg.streaming} />
+                                                <FormattedMarkdownText text={cleanText} isStreaming={!!msg.streaming} onSuggestionClick={onSuggestionClick} />
                                             )}
                                         </div>
 

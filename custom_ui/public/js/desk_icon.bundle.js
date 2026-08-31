@@ -6,6 +6,12 @@
 (function () {
     // 1. Precise Frappe Route Checker
     function isOnlyDeskHome() {
+        // Never block scrolling while a dialog, search result, dropdown or input
+        // is active on top of the Desk home page.
+        if (document.querySelector('.modal.show, .modal-open, .search-dialog, .dropdown-menu.show, .awesomplete > ul:not([hidden])') ||
+            document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) {
+            return false;
+        }
         if (window.frappe && frappe.get_route) {
             const currentRoute = frappe.get_route();
             // Checking if current active view is strictly the main Desk Home/Workspaces grid
@@ -205,22 +211,33 @@
     function initializeIconSystem() {
         executeGlobalIconScan();
 
+        let scanTimer;
+        function scheduleIconScan(delay = 80) {
+            clearTimeout(scanTimer);
+            scanTimer = setTimeout(executeGlobalIconScan, delay);
+        }
+
         if (window.frappe && frappe.router) {
             frappe.router.on('change', () => {
-                setTimeout(executeGlobalIconScan, 60);
-                setTimeout(executeGlobalIconScan, 350);
+                scheduleIconScan(100);
             });
         }
 
         document.body.addEventListener('click', function (e) {
             if (e.target.closest('.desktop-icon') || e.target.closest('.btn') || e.target.closest('.theme-selector') || e.target.closest('.add-workspace')) {
-                setTimeout(executeGlobalIconScan, 120);
-                setTimeout(executeGlobalIconScan, 450);
+                scheduleIconScan(120);
             }
         });
 
-        const observer = new MutationObserver(() => {
-            executeGlobalIconScan();
+        const observer = new MutationObserver((mutations) => {
+            const needsScan = mutations.some(({ addedNodes }) =>
+                Array.from(addedNodes).some((node) =>
+                    node.nodeType === Node.ELEMENT_NODE &&
+                    (node.matches?.('.desktop-icon, .workspace-link-item, [data-link-type="workspace"], .removed-icon-item, .extra-icon-item') ||
+                     node.querySelector?.('.desktop-icon, .workspace-link-item, [data-link-type="workspace"], .removed-icon-item, .extra-icon-item'))
+                )
+            );
+            if (needsScan) scheduleIconScan();
         });
 
         const appWrapper = document.getElementById('app') || document.body;
@@ -495,4 +512,3 @@
 
 });
 })();
-

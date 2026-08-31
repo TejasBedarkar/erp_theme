@@ -54,4 +54,4 @@ jspm_packages/
 # Aider AI Chat
 .aider*
 
-custom_ui/public/node_modules/
+custom_ui/public/node_modules

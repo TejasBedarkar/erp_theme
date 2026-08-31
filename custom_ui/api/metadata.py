@@ -237,70 +237,102 @@ def get_complete_metadata_internal(doctype: str, visited_child_tables: Set[str])
     }
 
 
-# @frappe.whitelist(allow_guest=False, methods=["GET", "POST"])
-# def get_complete_doctype_metadata(doctype: Optional[str] = None) -> Dict[str, Any]:
-#     """Exposed API endpoint resolving full recursive structural schemas with exact user rights mapping."""
-#     if frappe.session.user == "Guest":
-#         frappe.local.response["http_status_code"] = 401
-#         return {"success": False, "error_type": "Unauthorized", "message": "Please login first."}
+@frappe.whitelist(allow_guest=False, methods=["GET", "POST"])
+def get_complete_doctype_metadata(doctype: Optional[str] = None) -> Dict[str, Any]:
+    """Exposed API endpoint resolving full recursive structural schemas with exact user rights mapping."""
+    if frappe.session.user == "Guest":
+        frappe.local.response["http_status_code"] = 401
+        return {"success": False, "error_type": "Unauthorized", "message": "Please login first."}
 
-#     params = frappe.local.form_dict
-#     target_doctype = doctype or params.get("doctype")
+    params = frappe.local.form_dict
+    target_doctype = doctype or params.get("doctype")
     
-#     if not target_doctype:
-#         frappe.local.response["http_status_code"] = 400
-#         return {"success": False, "error_type": "MissingParameter", "message": "Missing 'doctype'."}
+    if not target_doctype:
+        frappe.local.response["http_status_code"] = 400
+        return {"success": False, "error_type": "MissingParameter", "message": "Missing 'doctype'."}
         
-#     try:
-#         # Check overall DocType Doc-level permission
-#         if not frappe.has_permission(target_doctype, "read"):
-#             frappe.local.response["http_status_code"] = 403
-#             return {
-#                 "success": False,
-#                 "error_type": "PermissionDenied",
-#                 "message": f"User '{frappe.session.user}' has NO access to view metadata for: {target_doctype}"
-#             }
-            
-#         visited_nodes: Set[str] = {target_doctype}
-#         payload = get_complete_metadata_internal(target_doctype, visited_nodes)
-        
-#         return {
-#             "success": True,
-#             "doctype": target_doctype,
-#             "current_user": frappe.session.user,
-#             "data": payload
-#         }
-        
-#     except Exception as e:
-#         frappe.local.response["http_status_code"] = 500
-#         return {"success": False, "error_type": "ServerException", "message": str(e), "traceback": traceback.format_exc()}
-
-
-
-# ROHAN
-@frappe.whitelist()
-def get_complete_doctype_metadata(doctype: str):
-    enforce_permission(doctype, "get_list")  # "read"-equivalent gate
-
-    meta = frappe.get_meta(doctype)
-    return {
-        "doctype": doctype,
-        "fields": [
-            {
-                "fieldname": f.fieldname,
-                "label": f.label,
-                "fieldtype": f.fieldtype,
-                "reqd": f.reqd,
-                "options": f.options,
-                "read_only": f.read_only,
+    try:
+        # Check overall DocType Doc-level permission
+        if not frappe.has_permission(target_doctype, "read"):
+            frappe.local.response["http_status_code"] = 403
+            return {
+                "success": False,
+                "error_type": "PermissionDenied",
+                "message": f"User '{frappe.session.user}' has NO access to view metadata for: {target_doctype}"
             }
-            for f in meta.fields
-        ],
-        "permissions": meta.permissions,
-        "roles": frappe.get_roles(frappe.session.user),
-    }
+            
+        visited_nodes: Set[str] = {target_doctype}
+        payload = get_complete_metadata_internal(target_doctype, visited_nodes)
+        
+        return {
+            "success": True,
+            "doctype": target_doctype,
+            "current_user": frappe.session.user,
+            "data": payload
+        }
+        
+    except Exception as e:
+        frappe.local.response["http_status_code"] = 500
+        return {"success": False, "error_type": "ServerException", "message": str(e), "traceback": traceback.format_exc()}
 
 
 
+# # ROHAN
+# @frappe.whitelist()
+# def get_complete_doctype_metadata(doctype: str):
+#     enforce_permission(doctype, "get_list")  # "read"-equivalent gate
 
+#     meta = frappe.get_meta(doctype)
+#     return {
+#         "doctype": doctype,
+#         "fields": [
+#             {
+#                 "fieldname": f.fieldname,
+#                 "label": f.label,
+#                 "fieldtype": f.fieldtype,
+#                 "reqd": f.reqd,
+#                 "options": f.options,
+#                 "read_only": f.read_only,
+#             }
+#             for f in meta.fields
+#         ],
+#         "permissions": meta.permissions,
+#         "roles": frappe.get_roles(frappe.session.user),
+#     }
 
+@frappe.whitelist()
+def get_modules_summary():
+    """Returns a list of all active modules in ERPNext/Frappe."""
+    modules = frappe.get_all("Module Def", fields=["name", "module_name", "app_name"])
+    return modules
+
+@frappe.whitelist()
+def get_module_doctypes(module: str):
+    """Returns all accessible Doctypes within a given module."""
+    doctypes = frappe.get_all(
+        "DocType",
+        filters={"module": module, "istable": 0, "custom": 0},
+        fields=["name", "description"]
+    )
+    # Also fetch custom doctypes in this module
+    custom_doctypes = frappe.get_all(
+        "DocType",
+        filters={"module": module, "istable": 0, "custom": 1},
+        fields=["name", "description"]
+    )
+    
+    return doctypes + custom_doctypes
+
+@frappe.whitelist()
+def get_link_options(doctype: str, search_text: str = ""):
+    """Dynamically search and return valid options for a Link field."""
+    import frappe.desk.search
+    try:
+        results = frappe.desk.search.search_link(doctype, search_text)
+        return [{"value": r[0], "description": r[1] if len(r) > 1 else ""} for r in results]
+    except Exception:
+        filters = {}
+        if search_text:
+            filters["name"] = ["like", f"%{search_text}%"]
+        results = frappe.get_all(doctype, filters=filters, limit=20, pluck="name")
+        return [{"value": r} for r in results]

@@ -31,8 +31,7 @@ jobs:
 
             source env/bin/activate
 
-            bench build
-            bench --site all migrate
+            bench build --app custom_ui
             bench --site all clear-cache
 
             sudo systemctl restart nginx
