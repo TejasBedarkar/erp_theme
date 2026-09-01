@@ -1097,7 +1097,7 @@ html[data-theme-mode="sky"] .list-view-filters .control-input-wrapper {
    GENERAL DROPDOWN MENU
    ========================================================== */
 
-html[data-theme-mode="purple"] .dropdown-menu,
+/* html[data-theme-mode="purple"] .dropdown-menu,
 html[data-theme-mode="sky"] .dropdown-menu {
 
     position: absolute !important;
@@ -1114,7 +1114,7 @@ html[data-theme-mode="sky"] .dropdown-menu {
         0 12px 30px rgba(190, 120, 255, .25) !important;
 
     padding: 6px !important;
-}
+} */
 
 
 /* ==========================================================
@@ -1806,11 +1806,11 @@ html[data-theme-mode="sky"] .dropdown-menu .dropdown-item {
    DO NOT CHANGE OVERFLOW HERE
    ========================================================== */
 
-html[data-theme-mode="purple"] .form-control:focus,
+/* html[data-theme-mode="purple"] .form-control:focus,
 html[data-theme-mode="sky"] .form-control:focus {
     position: relative !important;
     z-index: 2 !important;
-}
+} */
 /* ==========================================================
    PURPLE THEME
    ADD TO TODO / ASSIGN TO DROPDOWN - FINAL FIX
@@ -3445,4 +3445,77 @@ html[data-theme-mode="purple"] .awesomplete > ul > li:hover,
 html[data-theme-mode="purple"] .awesomplete > ul > li[aria-selected="true"] {
     background: #F5EAFF !important;
     color: #9A4DF0 !important;
+}
+/* ==========================================================
+   PURPLE - AWESOMPLETE DROPDOWN OVERLAP FIX
+   ========================================================== */
+
+html[data-theme-mode="purple"] .frappe-control:has(.awesomplete > ul:not([hidden])) {
+    position: relative !important;
+    z-index: 999999 !important;
+}
+
+html[data-theme-mode="purple"] .frappe-control:has(ul[role="listbox"]:not([hidden])) {
+    position: relative !important;
+    z-index: 999999 !important;
+}
+
+html[data-theme-mode="purple"] .awesomplete {
+    position: relative !important;
+    z-index: 1000000 !important;
+}
+
+html[data-theme-mode="purple"] .awesomplete > ul,
+html[data-theme-mode="purple"] ul[role="listbox"] {
+    position: absolute !important;
+    z-index: 2147483647 !important;
+
+    background: #ffffff !important;
+    opacity: 1 !important;
+
+    isolation: isolate !important;
+}
+/* =========================================================
+   PURPLE THEME - DROPDOWN OVERLAP FIX
+   ========================================================= */
+
+/* Keep the active dropdown field above all nearby fields */
+html[data-theme-mode="purple"] .frappe-control:has(.dropdown-menu.show),
+html[data-theme-mode="purple"] .form-group:has(.dropdown-menu.show) {
+    position: relative !important;
+    z-index: 999999 !important;
+}
+
+/* Dropdown itself */
+html[data-theme-mode="purple"] .dropdown-menu.show {
+    position: absolute !important;
+    z-index: 2147483647 !important;
+
+    background: #ffffff !important;
+    border: 1px solid #E6D2FF !important;
+    border-radius: 10px !important;
+
+    box-shadow: 0 12px 30px rgba(156, 39, 255, 0.20) !important;
+
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Keep dropdown content above the form controls behind it */
+html[data-theme-mode="purple"] .dropdown-menu.show *,
+html[data-theme-mode="purple"] .dropdown-menu.show li {
+    position: relative;
+    z-index: 2147483647 !important;
+}
+
+/* Items / Warehouses / UOM dropdown wrapper */
+html[data-theme-mode="purple"] .multiselect-list.dropdown.input-xs {
+    z-index: 2147483647 !important;
+    background: #ffffff !important;
+}
+
+/* Prevent nearby checkbox/field text from appearing over dropdown */
+html[data-theme-mode="purple"] .frappe-control:not(:has(.dropdown-menu.show)),
+html[data-theme-mode="purple"] .form-group:not(:has(.dropdown-menu.show)) {
+    z-index: 1 !important;
 }
