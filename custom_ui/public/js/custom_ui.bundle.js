@@ -103,7 +103,7 @@ $(document).on("click", function (e) {
             dropdown.style.setProperty("bottom", "auto", "important");
         }
 
-        dropdown.style.setProperty("background", "#FFFFFF", "important");
+        // dropdown.style.setProperty("background", "#FFFFFF", "important");
         dropdown.style.setProperty("opacity", "1", "important");
         dropdown.style.setProperty("visibility", "visible", "important");
         dropdown.style.setProperty("overflow-y", "auto", "important");

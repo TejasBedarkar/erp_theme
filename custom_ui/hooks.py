@@ -6,21 +6,22 @@ app_email = "asd@ansd.com"
 app_license = "mit"
 
 app_include_css = [
-	"custom_ui.bundle.css"
+	"custom_ui.bundle.css",
+	# "desk_fix.css"
 ]
 
 app_include_js = [
 	"custom_ui.bundle.js",
 	"desk_custom.bundle.js",
-	"sidebar_custom.bundle.js",
+	# "sidebar_custom.bundle.js",
 	"chatbot_widget.bundle.jsx",
-	"iot_dashboard.bundle.js",
+	# "iot_dashboard.bundle.js",
 	# "manufacturing_dashboard_injector.bundle.js",
 	# "desktop_theme_modifier.bundle.js"
 	"desk_icon.bundle.js",
 	# "branding.js", 
 	# "magna_login.js",
-	"list_view.js",
+	"/assets/custom_ui/js/list_view.js",
 ]
 
 web_include_css = [

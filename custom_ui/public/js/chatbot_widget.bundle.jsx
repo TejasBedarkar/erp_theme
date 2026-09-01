@@ -1,8 +1,4 @@
 // chatbot_widget.bundle.jsx
-import React, { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom/client';
-import AssistantPortal from './magna_ai_assistant/AssistantPortal';
-
 // Premium Lucide MessageSquareCode Icon SVG String for Native Injection
 const ChatBotIconSVG = `
     <svg 
@@ -23,17 +19,31 @@ const ChatBotIconSVG = `
     </svg>
 `;
 
-function MagnaAICopilotApp({ registerOpenHandler }) {
-    const [isOpen, setIsOpen] = useState(false);
+let assistantLoadPromise;
+let openPortalFn;
 
-    useEffect(() => {
-        // Register the function to toggle chatbot visibility
-        registerOpenHandler(() => setIsOpen(true));
-    }, [registerOpenHandler]);
+async function openAssistant() {
+    if (openPortalFn) {
+        openPortalFn();
+        return;
+    }
 
-    return (
-        <AssistantPortal isOpen={isOpen} onClose={() => setIsOpen(false)} />
-    );
+    const button = document.getElementById('magna-navbar-chat-trigger');
+    button?.setAttribute('aria-busy', 'true');
+
+    try {
+        assistantLoadPromise ||= frappe.require('assistant_portal.bundle.jsx');
+        await assistantLoadPromise;
+        openPortalFn = window.mountMagnaAssistant;
+        if (typeof openPortalFn !== 'function') throw new Error('Assistant entry did not initialize');
+        openPortalFn();
+    } catch (error) {
+        assistantLoadPromise = undefined;
+        console.error('[Magna AI] Failed to load assistant:', error);
+        frappe?.show_alert?.({ message: 'Unable to load Magna AI. Please try again.', indicator: 'red' });
+    } finally {
+        button?.removeAttribute('aria-busy');
+    }
 }
 
 // Function to safely inject button into the LEFT of the Bell Container
@@ -41,8 +51,12 @@ function injectChatbotButton() {
     // Agar button already present hai, toh dobara inject mat karo
     if (document.getElementById('magna-navbar-chat-trigger')) return true;
 
-    // Target the main notifications outer wrapper container
-    const bellContainer = $('.desktop-navbar .desktop-notifications');
+    // Try to find a valid container on the right side of the navbar
+    let bellContainer = $('.desktop-navbar .desktop-notifications'); // Classic Frappe
+    if (!bellContainer.length) bellContainer = $('.navbar-right .dropdown-notifications');
+    if (!bellContainer.length) bellContainer = $('.navbar-nav.navbar-right > li').first();
+    if (!bellContainer.length) bellContainer = $('.navbar-right').children().first();
+    if (!bellContainer.length) bellContainer = $('.widget-group-right').children().first();
 
     if (bellContainer && bellContainer.length > 0) {
         const chatButtonHTML = `
@@ -80,6 +94,11 @@ function injectChatbotButton() {
 
         // INJECT ON THE LEFT: Bell container ke theek pehle
         bellContainer.before(chatButtonHTML);
+        document.getElementById('magna-navbar-chat-trigger')?.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openAssistant();
+        }, { capture: true });
         console.log("Magna Chatbot Button Injected on navigation / route change.");
         return true;
     }
@@ -87,29 +106,20 @@ function injectChatbotButton() {
 }
 
 $(document).on('app_ready', function() {
-    if (document.getElementById('magna-ai-copilot-container')) return;
+    if (document.documentElement.dataset.magnaChatbotInitialized) return;
+    document.documentElement.dataset.magnaChatbotInitialized = 'true';
 
     // 1. Initial Injection
     injectChatbotButton();
 
-    // 2. Continuous MutationObserver to watch DOM over-writes
-    const observer = new MutationObserver((mutations) => {
-        injectChatbotButton();
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-
-    // 3. Frappe Native Events Support: Page and Route changes trigger button recovery
+    // Frappe route changes trigger button recovery if the navbar was rebuilt.
     $(document).on('page-change route-change hashchange', function() {
         setTimeout(() => {
             injectChatbotButton();
         }, 100); // 100ms standard render gap buffer
     });
 
-    // 4. Custom Dark & Light Dynamic Theme Styles (Frappe v16 Compatible)
+    // Custom Dark & Light Dynamic Theme Styles (Frappe v16 Compatible)
     const cssText = `
         <style>
             #magna-navbar-chat-trigger {
@@ -161,24 +171,4 @@ $(document).on('app_ready', function() {
     `;
     $('head').append(cssText);
 
-    // 5. React Mount
-    const container = document.createElement('div');
-    container.id = 'magna-ai-copilot-container';
-    document.body.appendChild(container);
-
-    let openPortalFn = () => {};
-
-    const root = ReactDOM.createRoot(container);
-    root.render(
-        <MagnaAICopilotApp registerOpenHandler={(fn) => { openPortalFn = fn; }} />
-    );
-
-    // 6. Global event delegate
-    $(document).on('click', '#magna-navbar-chat-trigger', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof openPortalFn === 'function') {
-            openPortalFn();
-        }
-    });
 });

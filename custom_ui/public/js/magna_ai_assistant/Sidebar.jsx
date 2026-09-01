@@ -65,7 +65,7 @@ export default function Sidebar({ chatHistory, currentChatId, onSelectChat, onNe
                             animate={{ opacity: 1, x: 0 }} 
                             style={{ fontWeight: '700', fontSize: '14.5px', color: 'var(--text-color, #0f172a)', letterSpacing: '-0.3px' }}
                         >
-                            Magna Engine
+                            Magna AI
                         </motion.span>
                     )}
                     

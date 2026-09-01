@@ -13,6 +13,7 @@ from frappe import _
 from frappe.model.meta import Meta
 from typing import Dict, Any, List, Optional, Set
 import traceback
+from custom_ui.api.access_control import enforce_permission   #ROHAN
 
 
 def get_all_properties(obj: Any) -> Dict[str, Any]:
@@ -273,3 +274,65 @@ def get_complete_doctype_metadata(doctype: Optional[str] = None) -> Dict[str, An
     except Exception as e:
         frappe.local.response["http_status_code"] = 500
         return {"success": False, "error_type": "ServerException", "message": str(e), "traceback": traceback.format_exc()}
+
+
+
+# # ROHAN
+# @frappe.whitelist()
+# def get_complete_doctype_metadata(doctype: str):
+#     enforce_permission(doctype, "get_list")  # "read"-equivalent gate
+
+#     meta = frappe.get_meta(doctype)
+#     return {
+#         "doctype": doctype,
+#         "fields": [
+#             {
+#                 "fieldname": f.fieldname,
+#                 "label": f.label,
+#                 "fieldtype": f.fieldtype,
+#                 "reqd": f.reqd,
+#                 "options": f.options,
+#                 "read_only": f.read_only,
+#             }
+#             for f in meta.fields
+#         ],
+#         "permissions": meta.permissions,
+#         "roles": frappe.get_roles(frappe.session.user),
+#     }
+
+@frappe.whitelist()
+def get_modules_summary():
+    """Returns a list of all active modules in ERPNext/Frappe."""
+    modules = frappe.get_all("Module Def", fields=["name", "module_name", "app_name"])
+    return modules
+
+@frappe.whitelist()
+def get_module_doctypes(module: str):
+    """Returns all accessible Doctypes within a given module."""
+    doctypes = frappe.get_all(
+        "DocType",
+        filters={"module": module, "istable": 0, "custom": 0},
+        fields=["name", "description"]
+    )
+    # Also fetch custom doctypes in this module
+    custom_doctypes = frappe.get_all(
+        "DocType",
+        filters={"module": module, "istable": 0, "custom": 1},
+        fields=["name", "description"]
+    )
+    
+    return doctypes + custom_doctypes
+
+@frappe.whitelist()
+def get_link_options(doctype: str, search_text: str = ""):
+    """Dynamically search and return valid options for a Link field."""
+    import frappe.desk.search
+    try:
+        results = frappe.desk.search.search_link(doctype, search_text)
+        return [{"value": r[0], "description": r[1] if len(r) > 1 else ""} for r in results]
+    except Exception:
+        filters = {}
+        if search_text:
+            filters["name"] = ["like", f"%{search_text}%"]
+        results = frappe.get_all(doctype, filters=filters, limit=20, pluck="name")
+        return [{"value": r} for r in results]

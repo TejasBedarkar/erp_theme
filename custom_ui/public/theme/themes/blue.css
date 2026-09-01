@@ -38,3 +38,157 @@
 	--card-shadow: var(--shadow-dark-lg);
 	--card-shadow-hover: var(--shadow-dark-hover);
 }
+/* ==========================================================
+   OCEAN BLUE THEME
+   AWESOMPLETE / LINK DROPDOWN
+   ========================================================== */
+
+
+/* ==========================================================
+   DROPDOWN CONTAINER
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul,
+html[data-theme="blue"] .awesomplete > ul,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul,
+html[data-theme="ocean-blue"] .awesomplete > ul,
+
+html[data-theme-mode="blue"] ul[role="listbox"],
+html[data-theme="blue"] ul[role="listbox"],
+html[data-theme-mode="ocean-blue"] ul[role="listbox"],
+html[data-theme="ocean-blue"] ul[role="listbox"] {
+    background-color: #16324d !important;
+    background-image: none !important;
+
+    border: 1px solid #2b5578 !important;
+
+    color: #eef6ff !important;
+
+    box-shadow:
+        0 10px 25px rgba(15, 45, 75, 0.45) !important;
+}
+
+
+/* ==========================================================
+   NORMAL DROPDOWN OPTIONS
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul > li,
+html[data-theme="blue"] .awesomplete > ul > li,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul > li,
+html[data-theme="ocean-blue"] .awesomplete > ul > li,
+
+html[data-theme-mode="blue"] ul[role="listbox"] > li,
+html[data-theme="blue"] ul[role="listbox"] > li,
+html[data-theme-mode="ocean-blue"] ul[role="listbox"] > li,
+html[data-theme="ocean-blue"] ul[role="listbox"] > li {
+    background-color: #16324d !important;
+    background-image: none !important;
+
+    color: #eef6ff !important;
+}
+
+
+/* ==========================================================
+   HOVER
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul > li:hover,
+html[data-theme="blue"] .awesomplete > ul > li:hover,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul > li:hover,
+html[data-theme="ocean-blue"] .awesomplete > ul > li:hover,
+
+html[data-theme-mode="blue"] ul[role="listbox"] > li:hover,
+html[data-theme="blue"] ul[role="listbox"] > li:hover,
+html[data-theme-mode="ocean-blue"] ul[role="listbox"] > li:hover,
+html[data-theme="ocean-blue"] ul[role="listbox"] > li:hover {
+    background-color: #285070 !important;
+    background-image: none !important;
+
+    color: #ffffff !important;
+}
+
+
+/* ==========================================================
+   ACTIVE / SELECTED OPTION
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul > li.active,
+html[data-theme="blue"] .awesomplete > ul > li.active,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul > li.active,
+html[data-theme="ocean-blue"] .awesomplete > ul > li.active,
+
+html[data-theme-mode="blue"] .awesomplete > ul > li[aria-selected="true"],
+html[data-theme="blue"] .awesomplete > ul > li[aria-selected="true"],
+html[data-theme-mode="ocean-blue"] .awesomplete > ul > li[aria-selected="true"],
+html[data-theme="ocean-blue"] .awesomplete > ul > li[aria-selected="true"],
+
+html[data-theme-mode="blue"] ul[role="listbox"] > li.active,
+html[data-theme="blue"] ul[role="listbox"] > li.active,
+html[data-theme-mode="ocean-blue"] ul[role="listbox"] > li.active,
+html[data-theme="ocean-blue"] ul[role="listbox"] > li.active,
+
+html[data-theme-mode="blue"] ul[role="listbox"] > li[aria-selected="true"],
+html[data-theme="blue"] ul[role="listbox"] > li[aria-selected="true"],
+html[data-theme-mode="ocean-blue"] ul[role="listbox"] > li[aria-selected="true"],
+html[data-theme="ocean-blue"] ul[role="listbox"] > li[aria-selected="true"] {
+    background-color: #285070 !important;
+    background-image: none !important;
+
+    color: #ffffff !important;
+}
+
+
+/* ==========================================================
+   CREATE NEW / ADVANCED SEARCH
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul .awesomplete-create,
+html[data-theme="blue"] .awesomplete > ul .awesomplete-create,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul .awesomplete-create,
+html[data-theme="ocean-blue"] .awesomplete > ul .awesomplete-create,
+
+html[data-theme-mode="blue"] .awesomplete > ul .awesomplete-search,
+html[data-theme="blue"] .awesomplete > ul .awesomplete-search,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul .awesomplete-search,
+html[data-theme="ocean-blue"] .awesomplete > ul .awesomplete-search {
+    background-color: #16324d !important;
+    background-image: none !important;
+
+    color: #ffffff !important;
+}
+
+
+/* ==========================================================
+   CREATE / ADVANCED SEARCH HOVER
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul .awesomplete-create:hover,
+html[data-theme="blue"] .awesomplete > ul .awesomplete-create:hover,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul .awesomplete-create:hover,
+html[data-theme="ocean-blue"] .awesomplete > ul .awesomplete-create:hover,
+
+html[data-theme-mode="blue"] .awesomplete > ul .awesomplete-search:hover,
+html[data-theme="blue"] .awesomplete > ul .awesomplete-search:hover,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul .awesomplete-search:hover,
+html[data-theme="ocean-blue"] .awesomplete > ul .awesomplete-search:hover {
+    background-color: #285070 !important;
+    background-image: none !important;
+
+    color: #ffffff !important;
+}
+
+
+/* ==========================================================
+   FILTERED / INFO ROW
+   ========================================================== */
+
+html[data-theme-mode="blue"] .awesomplete > ul .filtered,
+html[data-theme="blue"] .awesomplete > ul .filtered,
+html[data-theme-mode="ocean-blue"] .awesomplete > ul .filtered,
+html[data-theme="ocean-blue"] .awesomplete > ul .filtered {
+    background-color: #16324d !important;
+    background-image: none !important;
+
+    color: #cfe2f6 !important;
+}
