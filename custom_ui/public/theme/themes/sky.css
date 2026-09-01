@@ -1,7 +1,18 @@
-/* ==========================================================
-   SKY THEME VARIABLES & DESIGN TOKENS
-========================================================== */
+/* ============================================================
+   SKY THEME — CLEANED & DEDUPLICATED
+   Same story as the purple theme: the dropdown / notification /
+   z-index rules were rewritten as ~15 overlapping "FINAL FIX"
+   patches, and the very last one put .page-head back at a high
+   z-index (1000), which is what pushed the Notification panel,
+   the Display menu, and the "..." Actions menu behind it. This
+   version keeps only the winning declarations and uses the same
+   low-z-index-for-chrome / high-z-index-for-overlays scheme that
+   was applied to the purple theme.
+   ============================================================ */
 
+/* ------------------------------------------------------------
+   1. THEME VARIABLES
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] {
     --primary: #2f5fb8;
     --primary-hover: #1e4fa0;
@@ -26,7 +37,7 @@ html[data-theme-mode="sky"] {
     --shadow-lg: 0 18px 40px rgba(47, 111, 237, 0.12);
     --shadow-hover: 0 12px 24px rgba(47, 111, 237, 0.16);
 
-    /* Frappe Variable Mapping */
+    /* Frappe variable mapping */
     --bg-color: var(--background);
     --fg-color: var(--surface);
     --surface-menu-bar: var(--surface);
@@ -49,10 +60,9 @@ html[data-theme-mode="sky"] {
     --scrollbar-track-color: var(--background);
 }
 
-/* ==========================================================
-   GLOBAL LAYOUT & BACKGROUND
-========================================================== */
-
+/* ------------------------------------------------------------
+   2. GLOBAL LAYOUT & BACKGROUND
+------------------------------------------------------------ */
 html[data-theme-mode="sky"],
 html[data-theme-mode="sky"] body,
 html[data-theme-mode="sky"] #body,
@@ -125,10 +135,9 @@ html[data-theme-mode="sky"] .layout-main-section > * {
     z-index: 5;
 }
 
-/* ==========================================================
-   DASHBOARD & CARDS
-========================================================== */
-
+/* ------------------------------------------------------------
+   3. DASHBOARD & CARDS
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] .widget,
 html[data-theme-mode="sky"] .dashboard-widget,
 html[data-theme-mode="sky"] .number-widget-box,
@@ -189,9 +198,14 @@ html[data-theme-mode="sky"] .widget:empty {
     display: none !important;
 }
 
-/* ==========================================================
-   SIDEBAR
-========================================================== */
+/* ------------------------------------------------------------
+   4. SIDEBAR
+------------------------------------------------------------ */
+html[data-theme-mode="sky"] .body-sidebar-container,
+html[data-theme-mode="sky"] .body-sidebar {
+    height: auto !important;
+    min-height: 100vh !important;
+}
 
 html[data-theme-mode="sky"] .body-sidebar {
     position: relative;
@@ -236,6 +250,8 @@ html[data-theme-mode="sky"] .sidebar-header .sidebar-item-label.header-subtitle 
 }
 
 html[data-theme-mode="sky"] .standard-sidebar-item {
+    position: relative;
+    z-index: 10;
     border-radius: var(--radius-sm);
     transition: .25s ease;
     color: #475569;
@@ -350,10 +366,15 @@ html[data-theme-mode="sky"] .body-sidebar::-webkit-scrollbar-track {
     background: var(--background);
 }
 
-/* ==========================================================
-   BUTTONS
-========================================================== */
+/* Sidebar notification bell must stay clickable */
+html[data-theme-mode="sky"] .sidebar-notification,
+html[data-theme-mode="sky"] .sidebar-notification .item-anchor {
+    pointer-events: auto !important;
+}
 
+/* ------------------------------------------------------------
+   5. BUTTONS
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] .btn-primary,
 html[data-theme-mode="sky"] .btn.btn-primary,
 html[data-theme-mode="sky"] button.btn-primary,
@@ -388,40 +409,89 @@ html[data-theme-mode="sky"] .btn-secondary {
     border: 1px solid #cfe2fb;
 }
 
-/* ==========================================================
-   INPUTS & CONTROLS
-========================================================== */
-
+/* ------------------------------------------------------------
+   6. INPUTS & CHECKBOXES
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] .form-control {
     background: rgba(255, 255, 255, .92);
     border: 1px solid #cfe2fb;
 }
 
 html[data-theme-mode="sky"] .form-control:focus {
+    position: relative !important;
+    z-index: 2 !important;
     border-color: var(--primary);
     box-shadow: 0 0 0 4px rgba(47, 111, 237, .18);
 }
 
-html[data-theme-mode="sky"] input[type="checkbox"] {
-    accent-color: var(--primary);
+html[data-theme-mode="sky"] input[type="checkbox"],
+html[data-theme-mode="sky"] .grid-row input[type="checkbox"],
+html[data-theme-mode="sky"] .modal input[type="checkbox"],
+html[data-theme-mode="sky"] .sticky-col-container input[type="checkbox"],
+html[data-theme-mode="sky"] div[class*="col-"] input[type="checkbox"] {
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
     width: 14px !important;
     height: 14px !important;
-    margin: 0 6px 0 0 !important;
-    vertical-align: middle;
-    position: relative;
-    top: -1px;
+    min-width: 14px !important;
+    min-height: 14px !important;
+    margin: 0 10px 0 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    accent-color: #2f5fb8 !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    z-index: 2 !important;
+    position: relative !important;
+    cursor: pointer !important;
 }
 
 html[data-theme-mode="sky"] .checkbox,
-html[data-theme-mode="sky"] .frappe-control[data-fieldtype="Check"] .checkbox {
-    display: flex;
-    align-items: center;
+html[data-theme-mode="sky"] .frappe-control[data-fieldtype="Check"] .checkbox,
+html[data-theme-mode="sky"] .frappe-control[data-fieldtype="Check"] .label-area {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
 }
 
-/* ==========================================================
-   FORMS & LAYOUT CONTAINERS (STYLED CARDS WITH MATCHING ALIGNMENT)
-========================================================== */
+/* ------------------------------------------------------------
+   7. FORMS & LAYOUT CONTAINERS
+------------------------------------------------------------ */
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) {
+    height: auto !important;
+    min-height: 0 !important;
+    margin-bottom: 20px !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+}
 
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-page,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-layout,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-tab-content,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-tab-content .tab-pane,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-tab-content .form-section,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-footer,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-footer-wrapper,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .comments-section,
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-comments,
+html[data-theme-mode="sky"] .layout-main-section-wrapper:has(.form-page) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+}
+
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-page::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* The Sky "card" look for the form itself */
+html[data-theme-mode="sky"] .layout-main-section:has(.form-page) .form-layout > .form-page,
 html[data-theme-mode="sky"] .form-layout > .form-page,
 html[data-theme-mode="sky"] .form-layout-main,
 html[data-theme-mode="sky"] .form-dashboard-section {
@@ -432,6 +502,41 @@ html[data-theme-mode="sky"] .form-dashboard-section {
     border-radius: var(--radius-lg) !important;
     padding: 24px !important;
     margin-bottom: 20px !important;
+}
+
+/* Same card treatment for forms that have no tabs at all */
+html[data-theme-mode="sky"] .form-page:not(:has(.form-tabs-list .nav-link)) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: rgba(255, 255, 255, 0.75) !important;
+    border: 1px solid rgba(207, 226, 251, 0.8) !important;
+    border-radius: 22px !important;
+    box-shadow: var(--shadow-sm) !important;
+    overflow: visible !important;
+    display: block !important;
+}
+
+html[data-theme-mode="sky"] .form-page:not(:has(.form-tabs-list .nav-link)) .form-dashboard {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+html[data-theme-mode="sky"] .form-layout:has(.form-page:not(:has(.form-tabs-list .nav-link))) {
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
 }
 
 html[data-theme-mode="sky"] .form-column {
@@ -455,6 +560,27 @@ html[data-theme-mode="sky"] .section-head {
     margin-bottom: 14px;
 }
 
+html[data-theme-mode="sky"] .form-layout {
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: visible !important;
+}
+
+html[data-theme-mode="sky"] .form-tab-content {
+    position: relative !important;
+    z-index: 1 !important;
+    background: transparent !important;
+}
+
+html[data-theme-mode="sky"] .form-tab-content .form-section,
+html[data-theme-mode="sky"] .form-tab-content .form-column,
+html[data-theme-mode="sky"] .form-tab-content .section-body {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* Underline-style tabs (the sky theme's own look, not the boxed
+   look used by purple) */
 html[data-theme-mode="sky"] .form-tabs-list .nav-link {
     background: transparent !important;
     border: none !important;
@@ -488,10 +614,9 @@ html[data-theme-mode="sky"] .form-tabs-list .nav-link.active::after {
     background: var(--primary);
 }
 
-/* ==========================================================
-   APP ICONS & MODULES
-========================================================== */
-
+/* ------------------------------------------------------------
+   8. APP ICONS & MODULES
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] .app-icon {
     background: rgba(159, 200, 255, .25);
     color: var(--primary);
@@ -510,14 +635,11 @@ html[data-theme-mode="sky"] .app-icon {
     filter: hue-rotate(67deg) saturate(1.8) !important;
 }
 
-/* ==========================================================
-   THEME PREVIEW
-========================================================== */
-
+/* Theme switcher preview swatch */
 .theme-preview.preview-sky .background {
     background:
-        radial-gradient(circle at bottom left, rgba(47, 111, 237, 0.35) 0%, rgba(95, 158, 255, 0.18) 30%, rgba(255,255,255,0) 55%),
-        radial-gradient(circle at top right, rgba(47, 111, 237, 0.28) 0%, rgba(255,255,255,0) 45%),
+        radial-gradient(circle at bottom left, rgba(47, 111, 237, 0.35) 0%, rgba(95, 158, 255, 0.18) 30%, rgba(255, 255, 255, 0) 55%),
+        radial-gradient(circle at top right, rgba(47, 111, 237, 0.28) 0%, rgba(255, 255, 255, 0) 45%),
         #ffffff;
 }
 
@@ -525,261 +647,63 @@ html[data-theme-mode="sky"] .app-icon {
     background: linear-gradient(90deg, #2f5fb8, #5f9eff);
 }
 
-/* ==========================================================
-   SKY THEME CHECKBOX FIX
-========================================================== */
-
-html[data-theme-mode="sky"] input[type="checkbox"],
-html[data-theme-mode="sky"] .grid-row input[type="checkbox"],
-html[data-theme-mode="sky"] .modal input[type="checkbox"],
-html[data-theme-mode="sky"] .sticky-col-container input[type="checkbox"],
-html[data-theme-mode="sky"] div[class*="col-"] input[type="checkbox"] {
-    appearance: auto !important;
-    -webkit-appearance: checkbox !important;
-
-    width: 14px !important;
-    height: 14px !important;
-
-    min-width: 14px !important;
-    min-height: 14px !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    background: transparent !important;
-
-    accent-color: #2f5fb8 !important;
-
-    pointer-events: auto !important;
-    opacity: 1 !important;
-    z-index: 999 !important;
-    position: relative !important;
-    cursor: pointer !important;
-}
-
-/* ==========================================================
-   SKY THEME CHECKBOX SPACING FIX
-========================================================== */
-
-html[data-theme-mode="sky"] input[type="checkbox"],
-html[data-theme-mode="sky"] .grid-row input[type="checkbox"],
-html[data-theme-mode="sky"] .modal input[type="checkbox"],
-html[data-theme-mode="sky"] .sticky-col-container input[type="checkbox"],
-html[data-theme-mode="sky"] div[class*="col-"] input[type="checkbox"] {
-    appearance: auto !important;
-    -webkit-appearance: checkbox !important;
-
-    width: 14px !important;
-    height: 14px !important;
-
-    min-width: 14px !important;
-    min-height: 14px !important;
-
-    margin: 0 10px 0 0 !important;
-    padding: 0 !important;
-
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    background: transparent !important;
-
-    accent-color: #2f5fb8 !important;
-
-    pointer-events: auto !important;
-    opacity: 1 !important;
-    z-index: 999 !important;
-    position: relative !important;
-    cursor: pointer !important;
-}
-
-html[data-theme-mode="sky"] .checkbox,
-html[data-theme-mode="sky"] .frappe-control[data-fieldtype="Check"] .checkbox,
-html[data-theme-mode="sky"] .frappe-control[data-fieldtype="Check"] .label-area {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-}
-
-/* ==========================================================
-   AWESOMPLETE / LINK FIELD DROPDOWN FIX (FINAL v2)
-========================================================== */
-
-/* html[data-theme-mode="sky"] .awesomplete {
-    position: relative;
-    z-index: 99999 !important;
-}
-
-html[data-theme-mode="sky"] .awesomplete > ul,
-html[data-theme-mode="sky"] ul[role="listbox"] {
-
-    background: #FFFFFF !important;
-    opacity: 1 !important;
-
-    border: 1px solid #CFE2FB !important;
-    border-radius: 12px !important;
-
-    box-shadow: 0 12px 30px rgba(47, 95, 184, .20) !important;
-
-    z-index: 999999 !important;
-
-    padding: 4px !important;
-
-    /* Natural width */
-    /* min-width: 300px !important;
-    width: max-content !important;
-    max-width: 400px !important;
-} */
-
-/* Each option */
-html[data-theme-mode="sky"] .awesomplete > ul > [role="option"] {
-    display: block !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-
-    background: #FFFFFF !important;
-    color: #1E293B !important;
-    opacity: 1 !important;
-
-    padding: 8px 12px !important;
-    margin: 2px 0 !important;
-    border-radius: 8px !important;
-
-    font-weight: 500 !important;
-    white-space: nowrap !important;
-}
-
-html[data-theme-mode="sky"] .awesomplete > ul > [role="option"]:hover,
-html[data-theme-mode="sky"] .awesomplete > ul > [role="option"][aria-selected="true"] {
-    background: #EAF3FC !important;
-    color: #2F5FB8 !important;
-} 
-
-/* ==========================================================
-   FIX: FILTER ROW STACKING CONTEXT
-========================================================== */
-
-html[data-theme-mode="sky"] .page-form,
-html[data-theme-mode="sky"] .standard-filter-section {
-    position: relative !important;
-    z-index: 100 !important;
-}
-
-/* ==========================================================
-   SIMPLE SKY SEARCH / COMMAND PALETTE
-========================================================== */
-
-html[data-theme-mode="sky"] .modal-content input:focus,
-html[data-theme-mode="sky"] .search-dialog input:focus,
-html[data-theme-mode="sky"] input[type="text"]:focus {
-
-    border-color: #5F9EFF !important;
-    box-shadow: 0 0 0 3px rgba(95, 158, 255, .25) !important;
-}
-
-/* ==========================================================
-   MODAL SEARCH (Ctrl+K)
-========================================================== */
-
-/* html[data-theme-mode="sky"] .modal .awesomplete > ul,
-html[data-theme-mode="sky"] .modal ul[role="listbox"] {
-
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-
-    padding: 0 !important;
-    background: #FFFFFF !important;
-} */
-
-/* Modal dropdown uses <li> */
-/* html[data-theme-mode="sky"] .modal .awesomplete > ul > li {
-    display: block !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-
-    background: #FFFFFF !important;
-    color: #1E293B !important;
-
-    padding: 10px 16px !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-
-    white-space: normal !important;
-}
-
-html[data-theme-mode="sky"] .modal .awesomplete > ul > li:hover,
-html[data-theme-mode="sky"] .modal .awesomplete > ul > li[aria-selected="true"] {
-    background: #EAF3FC !important;
-    color: #2F5FB8 !important;
-} */
- /* ==========================================================
-   UNIFIED AWESOMPLETE + DROPDOWN-MENU FIX (list view, filters, assign) — SKY
-========================================================== */
-
+/* ------------------------------------------------------------
+   9. AWESOMPLETE / LINK-FIELD DROPDOWNS (unified — this block
+      replaces ~15 overlapping "fix" sections in the original)
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] .awesomplete {
     position: relative !important;
+    z-index: 100000 !important;
+    overflow: visible !important;
 }
 
 html[data-theme-mode="sky"] .control-input-wrapper,
 html[data-theme-mode="sky"] .control-input,
-html[data-theme-mode="sky"] .frappe-control {
+html[data-theme-mode="sky"] .frappe-control,
+html[data-theme-mode="sky"] .form-group,
+html[data-theme-mode="sky"] .form-control {
     overflow: visible !important;
 }
 
-/* the dropdown panel itself - ONE unified card, no per-item box */
 html[data-theme-mode="sky"] .awesomplete > ul,
 html[data-theme-mode="sky"] ul[role="listbox"] {
     position: absolute !important;
     top: calc(100% + 4px) !important;
     left: 0 !important;
-
-    /* min-width: 260px !important;
-    width: max-content !important;
-    max-width: 400px !important; */
     min-width: 100% !important;
-    /* width: max-content !important; */
+    width: max-content !important;
     max-width: 420px !important;
     max-height: 260px !important;
     overflow-y: auto !important;
-
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 6px !important;
     background: #ffffff !important;
     opacity: 1 !important;
-
+    visibility: visible !important;
     border: 1px solid #CFE2FB !important;
     border-radius: 12px !important;
     box-shadow: 0 12px 30px rgba(47, 95, 184, .20) !important;
-
-    padding: 6px !important;
-    margin: 0 !important;
-    z-index: 999999 !important;
+    z-index: 2147483647 !important;
 }
 
-/* items = flat rows inside the SAME card (no individual shadow/gap) */
 html[data-theme-mode="sky"] .awesomplete > ul > li,
 html[data-theme-mode="sky"] .awesomplete > ul > [role="option"] {
     display: block !important;
     width: 100% !important;
     box-sizing: border-box !important;
-
     background: transparent !important;
     color: #1E293B !important;
-
+    opacity: 1 !important;
     padding: 8px 12px !important;
     margin: 1px 0 !important;
     border-radius: 8px !important;
     box-shadow: none !important;
-
     font-weight: 500 !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    cursor: pointer !important;
 }
 
 html[data-theme-mode="sky"] .awesomplete > ul > li:hover,
@@ -790,75 +714,126 @@ html[data-theme-mode="sky"] .awesomplete > ul > [role="option"][aria-selected="t
     color: #2F5FB8 !important;
 }
 
-/* --- Modal-specific: allow dropdown to escape modal bounds --- */
-html[data-theme-mode="sky"] .modal-dialog,
-html[data-theme-mode="sky"] .modal-content,
-html[data-theme-mode="sky"] .modal-body,
-html[data-theme-mode="sky"] .form-layout {
+/* Containers that host a filter dropdown must never clip it, and
+   only need a MODEST z-index — just enough to sit above the list
+   table below them. A big number here (the original used 10000)
+   creates a stacking context that out-ranks the Actions/List View
+   menu, the Notification panel and the Display menu in the page
+   header, making them render BEHIND this row instead. */
+html[data-theme-mode="sky"] .page-form,
+html[data-theme-mode="sky"] .standard-filter-section,
+html[data-theme-mode="sky"] .list-filters,
+html[data-theme-mode="sky"] .report-filters {
+    position: relative !important;
+    z-index: 3 !important;
     overflow: visible !important;
 }
 
-/* --- List View top-right dropdowns: List View / Saved Filters / "..." menu --- */
-html[data-theme-mode="sky"] .dropdown-menu {
+html[data-theme-mode="sky"] .page-form .frappe-control,
+html[data-theme-mode="sky"] .standard-filter-section .frappe-control,
+html[data-theme-mode="sky"] .report-filters .frappe-control {
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: visible !important;
+}
+
+/* When a dropdown's input is focused, promote just that field
+   above its siblings so the open list isn't clipped by them */
+html[data-theme-mode="sky"] .form-page .form-group:has(.awesomplete input:focus),
+html[data-theme-mode="sky"] .form-page .form-section:has(.awesomplete input:focus),
+html[data-theme-mode="sky"] .form-page .form-column:has(.awesomplete input:focus),
+html[data-theme-mode="sky"] .form-page .frappe-control:has(.awesomplete input:focus),
+html[data-theme-mode="sky"] .standard-filter-section .frappe-control:has(.awesomplete input:focus),
+html[data-theme-mode="sky"] .report-filters .frappe-control:has(.awesomplete input:focus),
+html[data-theme-mode="sky"] .page-form .frappe-control:has(.awesomplete input:focus) {
+    position: relative !important;
+    z-index: 999 !important;
+    overflow: visible !important;
+}
+
+/* Multiselect (Items / Warehouses) dropdown */
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu,
+html[data-theme-mode="sky"] .multiselect-list.dropdown.input-xs {
+    position: absolute !important;
+    z-index: 100000 !important;
     background: #ffffff !important;
+}
+
+/* Generic Bootstrap-style dropdown menus (List View menu, "..."
+   Actions menu, saved filters, Display menu, etc.) */
+html[data-theme-mode="sky"] .dropdown-menu,
+html[data-theme-mode="sky"] .dropdown-menu.show {
+    z-index: 100000 !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
     border: 1px solid #CFE2FB !important;
     border-radius: 12px !important;
     box-shadow: 0 12px 30px rgba(47, 95, 184, .20) !important;
     padding: 6px !important;
-    z-index: 999999 !important;
 }
 
 html[data-theme-mode="sky"] .dropdown-menu .dropdown-item {
     border-radius: 8px !important;
     padding: 8px 12px !important;
     color: #1E293B !important;
+    background: #ffffff !important;
 }
 
 html[data-theme-mode="sky"] .dropdown-menu .dropdown-item:hover {
     background: #EAF3FC !important;
     color: #2F5FB8 !important;
 }
-/* ==========================================================
-   SKY THEME
-   ADD TO TODO / ASSIGN TO DROPDOWN - FINAL FIX
-   ========================================================== */
 
-
-/* Modal itself */
-html[data-theme-mode="sky"] .modal {
-    position: fixed !important;
-    z-index: 1050 !important;
+/* Any nested submenu (e.g. Display > Toggle Theme / Full Width /
+   Sidebar) must also get an opaque background — otherwise the
+   filter row behind it shows through, which looks like it's
+   "going behind" the page even though it's really just a
+   transparency issue on the submenu itself. */
+html[data-theme-mode="sky"] .frappe-menu,
+html[data-theme-mode="sky"] .frappe-menu.context-menu,
+html[data-theme-mode="sky"] .frappe-menu ul,
+html[data-theme-mode="sky"] .dropdown-menu-item-group {
+    background: #ffffff !important;
+    opacity: 1 !important;
+    z-index: 100000 !important;
 }
 
-
-/* Modal dialog */
-html[data-theme-mode="sky"] .modal .modal-dialog {
+/* Standard-actions toolbar (the "..." button group) */
+html[data-theme-mode="sky"] .standard-actions {
     position: relative !important;
-    z-index: 1051 !important;
+    z-index: 3 !important;
 }
 
-
-/* Modal containers must NOT clip dropdown */
-html[data-theme-mode="sky"] .modal .modal-content,
-html[data-theme-mode="sky"] .modal .modal-body,
-html[data-theme-mode="sky"] .modal .form-layout,
-html[data-theme-mode="sky"] .modal .form-page {
-    overflow: visible !important;
+/* Notification panel */
+html[data-theme-mode="sky"] .dropdown-notifications,
+html[data-theme-mode="sky"] .dropdown-notifications.show,
+html[data-theme-mode="sky"] .notifications-wrapper,
+html[data-theme-mode="sky"] .notifications-dropdown {
+    z-index: 100000 !important;
+    pointer-events: auto !important;
 }
 
+html[data-theme-mode="sky"] .dropdown-notifications .notification-list-header,
+html[data-theme-mode="sky"] .dropdown-notifications .notification-list-body {
+    pointer-events: auto !important;
+}
 
-/* ==========================================================
-   ASSIGN TO FIELD
-   ========================================================== */
+/* Popovers / tooltips / the navbar's own dropdowns */
+html[data-theme-mode="sky"] .navbar .dropdown-menu,
+html[data-theme-mode="sky"] .popover,
+html[data-theme-mode="sky"] .tooltip {
+    z-index: 100000 !important;
+}
 
+/* ------------------------------------------------------------
+   10. ASSIGN-TO MODAL DROPDOWN
+------------------------------------------------------------ */
 html[data-theme-mode="sky"] .modal .table-multiselect {
     position: relative !important;
     overflow: visible !important;
     z-index: 100 !important;
 }
 
-
-/* Awesomplete wrapper */
 html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete {
     position: relative !important;
     display: block !important;
@@ -867,784 +842,443 @@ html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete {
     z-index: 10000 !important;
 }
 
-
-/* ==========================================================
-   ASSIGN TO DROPDOWN
-   ========================================================== */
-
-html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete > ul {
-    position: absolute !important;
-
-    top: calc(100% + 4px) !important;
-    left: 0 !important;
-    right: auto !important;
-
-    width: 100% !important;
-    min-width: 100% !important;
-    max-width: 100% !important;
-
-    max-height: 220px !important;
-
-    margin: 0 !important;
-    padding: 5px !important;
-
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-
-    background: #FFFFFF !important;
-
-    border: 1px solid #CFE2FB !important;
-    border-radius: 9px !important;
-
-    box-shadow:
-        0 8px 24px rgba(47, 95, 184, .22) !important;
-
-    opacity: 1 !important;
-    visibility: visible !important;
-
-    z-index: 2147483647 !important;
-}
-
-
-/* ==========================================================
-   ASSIGN TO OPTIONS
-   ========================================================== */
-
-html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete > ul > li {
-    display: block !important;
-
-    width: 100% !important;
-    box-sizing: border-box !important;
-
-    margin: 1px 0 !important;
-    padding: 8px 12px !important;
-
-    background: #FFFFFF !important;
-    color: #1E293B !important;
-
-    border-radius: 7px !important;
-
-    white-space: normal !important;
-    overflow: visible !important;
-
-    cursor: pointer !important;
-}
-
-
-/* Hover */
-html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete > ul > li:hover {
-    background: #EAF3FC !important;
-    color: #2F5FB8 !important;
-}
-
-
-/* Selected */
-html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete > ul > li[aria-selected="true"] {
-    background: #D7E9FF !important;
-    color: #2F5FB8 !important;
-}
-
-
-/* ==========================================================
-   INPUT INSIDE ASSIGN TO
-   ========================================================== */
-
 html[data-theme-mode="sky"] .modal .table-multiselect .awesomplete input {
     width: 100% !important;
     box-sizing: border-box !important;
     background: #FFFFFF !important;
 }
 
-
-/* ==========================================================
-   IMPORTANT:
-   Don't allow next form fields to create a higher layer
-   ========================================================== */
-
-html[data-theme-mode="sky"] .modal .form-group {
-    position: relative !important;
-    z-index: 1 !important;
-}
-
-
-/* Assign To field stays above other fields */
 html[data-theme-mode="sky"] .modal .form-group:has(.table-multiselect) {
     z-index: 10000 !important;
 }
-/* ==========================================================
-   SEARCH / COMMAND PALETTE - SKY THEME
-   ORIGINAL FRAPPE LAYOUT
-   THEME COLORS ONLY
-   ========================================================== */
 
-/* Search result container - keep original Frappe structure */
-html[data-theme-mode="sky"] .modal-body.ui-front
-.awesomplete > ul {
+/* Global search / command palette result list keeps Frappe's
+   native static layout — only theme colors are applied */
+html[data-theme-mode="sky"] .modal-body.ui-front .awesomplete > ul {
     position: static !important;
-
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
     max-height: none !important;
-
     margin: 4px 0 0 0 !important;
     padding: 0 !important;
-
     overflow: visible !important;
-
     background: transparent !important;
-
     border: none !important;
     border-radius: 0 !important;
-
     box-shadow: none !important;
-
     z-index: auto !important;
 }
 
-
-/* Search result rows */
-html[data-theme-mode="sky"] .modal-body.ui-front
-.awesomplete > ul > li {
+html[data-theme-mode="sky"] .modal-body.ui-front .awesomplete > ul > li {
     position: relative !important;
-
     display: block !important;
-
     width: 100% !important;
     box-sizing: border-box !important;
-
     margin: 0 !important;
     padding: 8px 12px !important;
-
     background: transparent !important;
-
     border: none !important;
     border-radius: 0 !important;
-
     box-shadow: none !important;
-
     white-space: normal !important;
     overflow: visible !important;
-
     color: #2F2F38 !important;
-
     top: auto !important;
     transform: none !important;
 }
 
-
-/* Sky hover / selected row */
-html[data-theme-mode="sky"] .modal-body.ui-front
-.awesomplete > ul > li:hover,
-html[data-theme-mode="sky"] .modal-body.ui-front
-.awesomplete > ul > li[aria-selected="true"] {
+html[data-theme-mode="sky"] .modal-body.ui-front .awesomplete > ul > li:hover,
+html[data-theme-mode="sky"] .modal-body.ui-front .awesomplete > ul > li[aria-selected="true"] {
     background: #EAF5FF !important;
     color: #3B82F6 !important;
 }
 
-
-/* Sky search input focus */
-html[data-theme-mode="sky"] .modal-body.ui-front
-input:focus {
+html[data-theme-mode="sky"] .modal-body.ui-front input:focus {
     border-color: #5F9EFF !important;
-
-    box-shadow:
-        0 0 0 2px rgba(95, 158, 255, .15) !important;
+    box-shadow: 0 0 0 2px rgba(95, 158, 255, .15) !important;
 }
-/* ==========================================================
-   SKY THEME
-   FORM HEADER + TABS FIXED
-   NO TAB / FORM CONTENT OVERLAP
-   ========================================================== */
 
-/* Main layout must allow sticky positioning */
-html[data-theme-mode="sky"] .layout-main,
-html[data-theme-mode="sky"] .layout-main-section,
-html[data-theme-mode="sky"] .page-body,
-html[data-theme-mode="sky"] .page-wrapper,
-html[data-theme-mode="sky"] .page-content {
+html[data-theme-mode="sky"] .modal-content input:focus,
+html[data-theme-mode="sky"] .search-dialog input:focus,
+html[data-theme-mode="sky"] input[type="text"]:focus {
+    border-color: #5F9EFF !important;
+    box-shadow: 0 0 0 3px rgba(95, 158, 255, .25) !important;
+}
+
+/* ------------------------------------------------------------
+   11. MODALS (Theme switcher, Assign To, generic dialogs)
+------------------------------------------------------------ */
+html[data-theme-mode="sky"] .modal-backdrop {
+    z-index: 19999 !important;
+}
+
+html[data-theme-mode="sky"] .modal {
+    position: fixed !important;
+    z-index: 20000 !important;
+}
+
+html[data-theme-mode="sky"] .modal-dialog {
+    position: relative !important;
+    z-index: 20001 !important;
     overflow: visible !important;
 }
 
+html[data-theme-mode="sky"] .modal-content {
+    position: relative !important;
+    z-index: 20002 !important;
+    overflow: visible !important;
+}
 
-/* Form page */
+html[data-theme-mode="sky"] .modal-body {
+    overflow: visible !important;
+}
+
+html[data-theme-mode="sky"] .modal .modal-content,
+html[data-theme-mode="sky"] .modal .modal-body,
+html[data-theme-mode="sky"] .modal .form-layout,
+html[data-theme-mode="sky"] .modal .form-page {
+    overflow: visible !important;
+}
+
+/* ------------------------------------------------------------
+   12. PAGE HEAD / STICKY TABS
+   (kept intentionally low — see note in section 9 above)
+------------------------------------------------------------ */
+html[data-theme-mode="sky"] .page-head {
+    position: relative !important;
+    z-index: 5 !important;
+    overflow: visible !important;
+    background: #FFFFFF !important;
+}
+
+html[data-theme-mode="sky"] .page-head-content {
+    position: relative !important;
+    z-index: 6 !important;
+    overflow: visible !important;
+}
+
+html[data-theme-mode="sky"] .sidebar-header {
+    position: relative !important;
+    overflow: visible !important;
+}
+
 html[data-theme-mode="sky"] .form-page {
     position: relative !important;
     overflow: visible !important;
 }
 
-
-/* ==========================================================
-   TOP PAGE HEADER
-   First fixed header line
-   ========================================================== */
-
-html[data-theme-mode="sky"] .page-head {
-    position: sticky !important;
-
-    top: 0 !important;
-
-    z-index: 10000 !important;
-
-    background: #FFFFFF !important;
-}
-
-
-/* ==========================================================
-   FORM TABS
-   Second fixed header line
-   ========================================================== */
-
 html[data-theme-mode="sky"] .form-tabs-list.form-tabs-sticky-down {
-    position: sticky !important;
-
-    top: 42px !important;
-
-    z-index: 9999 !important;
-
     width: 100% !important;
-
     margin: 0 !important;
     padding: 0 !important;
-
     background: #FFFFFF !important;
-
     border-bottom: 1px solid #CFE2FB !important;
-
     box-sizing: border-box !important;
 }
 
-
-/* Tabs container */
 html[data-theme-mode="sky"] .form-tabs-list.form-tabs-sticky-down #form-tabs {
     position: relative !important;
-
-    z-index: 10000 !important;
-
+    z-index: 2 !important;
     min-height: 41px !important;
     height: 41px !important;
-
     margin: 0 !important;
     padding: 0 !important;
-
     background: #FFFFFF !important;
-
     display: flex !important;
-
     overflow: hidden !important;
 }
 
-
-/* Individual tabs */
 html[data-theme-mode="sky"] .form-tabs-list.form-tabs-sticky-down #form-tabs .nav-link {
     position: relative !important;
-
-    z-index: 10001 !important;
-
+    z-index: 3 !important;
     height: 41px !important;
-
     padding: 10px 15px !important;
-
     margin-right: 0 !important;
-
     background: #FFFFFF !important;
-
     color: #64748B !important;
-
     box-sizing: border-box !important;
-
     white-space: nowrap !important;
 }
 
-
-/* Hover */
 html[data-theme-mode="sky"] .form-tabs-list.form-tabs-sticky-down #form-tabs .nav-link:hover {
     background: #FFFFFF !important;
-
     color: #2F5FB8 !important;
 }
 
-
-/* Active tab */
 html[data-theme-mode="sky"] .form-tabs-list.form-tabs-sticky-down #form-tabs .nav-link.active {
     background: #FFFFFF !important;
-
     color: #2F5FB8 !important;
-
     font-weight: 600 !important;
-
     border-bottom: 2px solid #2F5FB8 !important;
-
     box-shadow: none !important;
 }
-
-
 /* ==========================================================
-   FORM CONTENT BELOW BOTH FIXED HEADERS
+   SKY THEME - ITEMS & WAREHOUSES DROPDOWN FINAL FIX
+   Keep dropdown above filter box/content
    ========================================================== */
 
-html[data-theme-mode="sky"] .form-tab-content {
+/* Parent multiselect must come above all neighbouring fields */
+html[data-theme-mode="sky"] .multiselect-list,
+html[data-theme-mode="sky"] .multiselect-list.show,
+html[data-theme-mode="sky"] .multiselect-list.dropdown {
     position: relative !important;
-
-    z-index: 1 !important;
-
-    background: transparent !important;
-}
-
-
-/* Form sections stay below tabs */
-html[data-theme-mode="sky"] .form-tab-content .form-section,
-html[data-theme-mode="sky"] .form-tab-content .form-column,
-html[data-theme-mode="sky"] .form-tab-content .section-body {
-    position: relative !important;
-
-    z-index: 1 !important;
-}
-
-
-/* Form layout */
-html[data-theme-mode="sky"] .form-layout {
-    position: relative !important;
-
-    z-index: 1 !important;
-
-    overflow: visible !important;
-}
-/* ==========================================================
-   THEME SWITCHER MODAL - KEEP ABOVE FIXED PAGE HEADER
-   ========================================================== */
-
-/* Theme switcher backdrop */
-html[data-theme-mode="purple"] .modal-backdrop,
-html[data-theme-mode="sky"] .modal-backdrop {
-    z-index: 19999 !important;
-}
-
-
-/* Theme switcher modal */
-html[data-theme-mode="purple"] .modal,
-html[data-theme-mode="sky"] .modal {
-    z-index: 20000 !important;
-}
-
-
-/* Modal dialog */
-html[data-theme-mode="purple"] .modal-dialog,
-html[data-theme-mode="sky"] .modal-dialog {
-    position: relative !important;
-    z-index: 20001 !important;
-}
-
-
-/* Modal content must stay above page header */
-html[data-theme-mode="purple"] .modal-content,
-html[data-theme-mode="sky"] .modal-content {
-    position: relative !important;
-    z-index: 20002 !important;
-}
-/* ==========================================================
-   SKY THEME
-   FORM PAGE + COMMENTS / ACTIVITY FIX
-   REMOVE LARGE EMPTY SPACE
-   KEEP HEADER + TABS FIXED
-   ========================================================== */
-
-
-/* ----------------------------------------------------------
-   MAIN FORM CONTAINER
-   Do not force full viewport height
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page) {
-    height: auto !important;
-    min-height: 0 !important;
-
-    margin-bottom: 20px !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   FORM PAGE
-   Natural height according to actual content
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page) .form-page {
-    height: auto !important;
-    min-height: 0 !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   FORM LAYOUT
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page) .form-layout {
-    height: auto !important;
-    min-height: 0 !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   FORM TAB CONTENT
-   Do NOT create a huge scroll container
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page) .form-tab-content {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   TAB PANE
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page)
-.form-tab-content .tab-pane {
-    height: auto !important;
-    min-height: 0 !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   FORM SECTIONS
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page)
-.form-tab-content .form-section {
-    height: auto !important;
-    min-height: 0 !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   COMMENTS / ACTIVITY
-   Keep them immediately after the form
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page)
-.form-footer,
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page)
-.form-footer-wrapper,
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page)
-.comments-section,
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page)
-.form-comments {
-    height: auto !important;
-    min-height: 0 !important;
-
-    overflow: visible !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* ----------------------------------------------------------
-   REMOVE EMPTY FORM SPACE
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page) .form-page::after {
-    display: none !important;
-    content: none !important;
-}
-
-
-/* ----------------------------------------------------------
-   OUTER WRAPPER
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section-wrapper:has(.form-page) {
-    height: auto !important;
-    min-height: 0 !important;
-
+    z-index: 2147483646 !important;
     overflow: visible !important;
 }
 
-
-/* ----------------------------------------------------------
-   KEEP SKY FORM CARD DESIGN
-   ---------------------------------------------------------- */
-
-html[data-theme-mode="sky"]
-.layout-main-section:has(.form-page) .form-layout > .form-page {
-    background: rgba(255, 255, 255, 0.75) !important;
-
-    border: 1px solid rgba(207, 226, 251, 0.8) !important;
-
-    border-radius: 22px !important;
-
-    box-shadow: var(--shadow-sm) !important;
-
-    box-sizing: border-box !important;
-}
-/* ==========================================================
-   SKY THEME
-   REMOVE EMPTY FORM-PAGE SPACE ABOVE COMMENTS / ACTIVITY
-   ONLY FOR PAGES WITHOUT FORM TABS
-   ========================================================== */
-
-html[data-theme-mode="sky"]
-.form-page:not(:has(.form-tabs-list .nav-link)) {
-
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    border: 0 !important;
-    border-radius: 0 !important;
-
-    background: transparent !important;
-    box-shadow: none !important;
-
-    overflow: hidden !important;
-}
-
-
-/* Remove dashboard itself */
-html[data-theme-mode="sky"]
-.form-page:not(:has(.form-tabs-list .nav-link)) .form-dashboard {
-
-    display: none !important;
-
-    width: 0 !important;
-    height: 0 !important;
-    min-height: 0 !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    border: 0 !important;
-    box-shadow: none !important;
-}
-
-
-/* Remove leftover spacing from form layout */
-html[data-theme-mode="sky"]
-.form-layout:has(.form-page:not(:has(.form-tabs-list .nav-link))) {
-
-    margin: 0 !important;
-    padding: 0 !important;
-}
-/* ==========================================================
-   SKY THEME - FORM CONTENT VISIBILITY FIX
-   Do NOT hide form-page for no-tab forms
-   ========================================================== */
-
-html[data-theme-mode="sky"]
-.form-page:not(:has(.form-tabs-list .nav-link)) {
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    background: rgba(255, 255, 255, 0.75) !important;
-
-    border: 1px solid rgba(207, 226, 251, 0.8) !important;
-    border-radius: 22px !important;
-
-    box-shadow: var(--shadow-sm) !important;
-
-    overflow: visible !important;
-
-    display: block !important;
-}
-
-
-/* Keep actual form content visible */
-html[data-theme-mode="sky"]
-.form-page:not(:has(.form-tabs-list .nav-link)) .form-dashboard {
-    display: block !important;
-
-    width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    background: transparent !important;
-
-    border: 0 !important;
-    box-shadow: none !important;
-}
-
-
-/* Keep form layout visible */
-html[data-theme-mode="sky"]
-.form-layout:has(.form-page:not(:has(.form-tabs-list .nav-link))) {
-    height: auto !important;
-    min-height: 0 !important;
-
-    margin: 0 !important;
-    padding: 0 !important;
-
-    overflow: visible !important;
-}
-/* ==========================================================
-   SKY THEME
-   SHIPPING ACCOUNT DROPDOWN - OVERLAP FIX
-   ========================================================== */
-
-html[data-theme-mode="sky"] .form-page .form-group {
-    position: relative !important;
-    z-index: 1 !important;
-}
-
-/* ONLY ACTIVE DROPDOWN FIELD goes above other fields */
-html[data-theme-mode="sky"] .form-page .form-group:has(.awesomplete input:focus) {
-    z-index: 10000 !important;
-}
-
-html[data-theme-mode="sky"] .form-page .form-group .awesomplete {
-    position: relative !important;
-    z-index: 999999 !important;
-}
-
-html[data-theme-mode="sky"] .form-page .form-group .awesomplete > ul {
+/* Items / Warehouses opened dropdown */
+html[data-theme-mode="sky"] .multiselect-list.show .dropdown-menu,
+html[data-theme-mode="sky"] .multiselect-list.dropdown.show .dropdown-menu,
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu.show {
     position: absolute !important;
-
-    top: calc(100% + 4px) !important;
-    left: 0 !important;
-
-    width: 100% !important;
-    min-width: 100% !important;
-
     z-index: 2147483647 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+}
 
+/* Keep the complete dropdown container above the filter row */
+html[data-theme-mode="sky"] .multiselect-list.dropdown.input-xs.show {
+    position: relative !important;
+    z-index: 2147483647 !important;
+    overflow: visible !important;
+}
+
+/* Dropdown itself must stay above the white filter/card box */
+html[data-theme-mode="sky"] .multiselect-list.dropdown.input-xs.show > .dropdown-menu {
+    z-index: 2147483647 !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Items / Warehouses dropdown content */
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu li,
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu .dropdown-item {
+    position: relative !important;
+    z-index: 2147483647 !important;
     background: #ffffff !important;
 }
 /* ==========================================================
-   SKY - FINAL AWESOMEPLETE DROPDOWN STACKING FIX
+   SKY THEME - SIDEBAR SCROLL ONLY
+   Do NOT affect notification panel
    ========================================================== */
 
-html[data-theme-mode="sky"] .form-page .form-section {
-    position: relative !important;
-    z-index: 1 !important;
-}
-
-html[data-theme-mode="sky"]
-.form-page .form-section:has(.awesomplete input:focus) {
-    position: relative !important;
-    z-index: 999999 !important;
-}
-
-html[data-theme-mode="sky"]
-.form-page .form-section:has(.awesomplete input:focus) .section-body {
-    position: relative !important;
-    z-index: 999999 !important;
-}
-
-html[data-theme-mode="sky"]
-.form-page .form-column:has(.awesomplete input:focus) {
-    position: relative !important;
-    z-index: 999999 !important;
-}
-
-html[data-theme-mode="sky"]
-.form-page .frappe-control:has(.awesomplete input:focus) {
-    position: relative !important;
-    z-index: 1000000 !important;
-}
-
-html[data-theme-mode="sky"]
-.form-page .awesomplete {
-    position: relative !important;
-    z-index: 1000000 !important;
+html[data-theme-mode="sky"] .body-sidebar {
+    height: 100vh !important;
+    max-height: 100vh !important;
     overflow: visible !important;
+    overscroll-behavior: auto !important;
 }
 
-html[data-theme-mode="sky"]
-.form-page .awesomplete > ul {
-    position: absolute !important;
-    top: calc(100% + 3px) !important;
-    left: 0 !important;
-
-    width: 100% !important;
-    min-width: 100% !important;
-
-    max-height: 280px !important;
-
-    margin: 0 !important;
-    padding: 4px 0 !important;
-
-    background: #ffffff !important;
-
-    border: 1px solid #b8d4ff !important;
-    border-radius: 8px !important;
-
-    box-shadow: 0 8px 25px rgba(40, 100, 190, 0.22) !important;
-
-    z-index: 2147483647 !important;
-
-    overflow-x: hidden !important;
+/* Only sidebar menu area should scroll */
+html[data-theme-mode="sky"] .body-sidebar .standard-items-sections {
+    max-height: calc(100vh - 120px) !important;
     overflow-y: auto !important;
-
-    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
 }
 
-html[data-theme-mode="sky"]
-.form-page .awesomplete > ul > li {
+
+/* ==========================================================
+   ITEMS / WAREHOUSES DROPDOWN
+   Keep dropdown above filter card
+   ========================================================== */
+
+html[data-theme-mode="sky"] .multiselect-list {
     position: relative !important;
-    display: block !important;
+    z-index: 999999 !important;
+}
 
-    width: 100% !important;
-    min-height: 34px !important;
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu,
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu.show {
+    z-index: 2147483647 !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
+}
 
-    padding: 8px 12px !important;
-    margin: 0 !important;
+
+/* Filter/card must not clip dropdown */
+html[data-theme-mode="sky"] .standard-filter-section,
+html[data-theme-mode="sky"] .page-form,
+html[data-theme-mode="sky"] .page-form .form-group,
+html[data-theme-mode="sky"] .page-form .frappe-control {
+    overflow: visible !important;
+}
+/* ==========================================================
+   SKY THEME - ITEMS / WAREHOUSES DROPDOWN FIX
+   Keep dropdown above the filter/card content
+   ========================================================== */
+
+html[data-theme-mode="sky"] .multiselect-list {
+    position: relative !important;
+    z-index: 999999 !important;
+    overflow: visible !important;
+}
+
+html[data-theme-mode="sky"] .multiselect-list .dropdown-menu {
+    position: absolute !important;
+    z-index: 2147483647 !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    overflow: visible !important;
+}
+
+html[data-theme-mode="sky"] .multiselect-list.dropdown.input-xs {
+    z-index: 2147483647 !important;
+    overflow: visible !important;
+}
+
+html[data-theme-mode="sky"] .multiselect-list.dropdown.input-xs .dropdown-menu {
+    z-index: 2147483647 !important;
+    background: #ffffff !important;
+}
+
+
+/* Make the filter/card area allow the dropdown to come outside */
+html[data-theme-mode="sky"] .standard-filter-section,
+html[data-theme-mode="sky"] .report-filters,
+html[data-theme-mode="sky"] .page-form {
+    overflow: visible !important;
+}
+/* =========================================================
+   SKY THEME - STOCK BALANCE ITEM & WAREHOUSE DROPDOWN FIX
+   Only Item + Warehouse dropdowns
+   Notification panel untouched
+   ========================================================= */
+
+html[data-theme-mode="sky"] .page-form
+.form-group[data-fieldname="item_code"]:has(.multiselect-list.dropdown.show),
+html[data-theme-mode="sky"] .page-form
+.form-group[data-fieldname="warehouse"]:has(.multiselect-list.dropdown.show) {
+    position: relative !important;
+    z-index: 2147483646 !important;
+}
+
+/* Item & Warehouse dropdown box */
+html[data-theme-mode="sky"] .page-form
+.form-group[data-fieldname="item_code"]
+.multiselect-list.dropdown.show,
+html[data-theme-mode="sky"] .page-form
+.form-group[data-fieldname="warehouse"]
+.multiselect-list.dropdown.show {
+    position: absolute !important;
+    z-index: 2147483647 !important;
 
     background: #ffffff !important;
-    border: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 
-    box-sizing: border-box !important;
+    isolation: isolate !important;
+
+    border: 1px solid #d6e3f5 !important;
+    border-radius: 10px !important;
+
+    box-shadow: 0 8px 25px rgba(30, 60, 100, 0.16) !important;
 }
 
-html[data-theme-mode="sky"]
-.form-page .awesomplete > ul > li:hover,
-html[data-theme-mode="sky"]
-.form-page .awesomplete > ul > li[aria-selected="true"] {
-    background: #edf5ff !important;
-    color: #2868c7 !important;
+/* Dropdown content should stay completely opaque */
+html[data-theme-mode="sky"] .page-form
+.form-group[data-fieldname="item_code"]
+.multiselect-list.dropdown.show *,
+html[data-theme-mode="sky"] .page-form
+.form-group[data-fieldname="warehouse"]
+.multiselect-list.dropdown.show * {
+    position: relative;
+    z-index: 2147483647 !important;
+}
+
+/* Keep dropdown above the filter card */
+html[data-theme-mode="sky"] .filter-section,
+html[data-theme-mode="sky"] .standard-filter-section,
+html[data-theme-mode="sky"] .page-form {
+    overflow: visible !important;
+}
+
+/* Keep the report/list area below these dropdowns */
+html[data-theme-mode="sky"] .query-report,
+html[data-theme-mode="sky"] .frappe-list,
+html[data-theme-mode="sky"] .list-view,
+html[data-theme-mode="sky"] .result {
+    z-index: 1 !important;
+}
+/* =========================================================
+   SKY THEME - ITEMS & WAREHOUSES
+   Same size as Item Group
+   ========================================================= */
+
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="item_code"],
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="warehouse"] {
+    width: 140px !important;
+    min-width: 140px !important;
+}
+
+/* Same Frappe input height/padding */
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="item_code"] .form-control,
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="warehouse"] .form-control {
+    width: 140px !important;
+    min-width: 140px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+
+    padding: 6px 8px !important;
+
+    border: 1px solid var(--border-color) !important;
+    border-radius: 6px !important;
+
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+}
+
+/* Items / Warehouses text */
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="item_code"] .status-text,
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="warehouse"] .status-text {
+    font-size: 12px !important;
+    line-height: 18px !important;
+    color: #8a8a8a !important;
+}
+
+/* Dropdown positioning/functionality unchanged */
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="item_code"] .dropdown-menu,
+html[data-theme-mode="sky"] 
+.multiselect-list[data-fieldname="warehouse"] .dropdown-menu {
+    z-index: 2147483647 !important;
+}
+/* =========================================================
+   SKY THEME - DETAILS / ACTIVITIES TABS SCROLL FIX
+   Tabs should scroll away with the page
+   ========================================================= */
+
+html[data-theme-mode="sky"] .form-tabs-list,
+html[data-theme-mode="sky"] .form-tabs,
+html[data-theme-mode="sky"] .form-tabs-list .nav-tabs {
+    position: static !important;
+    top: auto !important;
+    bottom: auto !important;
+    z-index: auto !important;
+}
+
+/* Remove sticky/fixed behavior from the tab row */
+html[data-theme-mode="sky"] .form-tabs-list.sticky,
+html[data-theme-mode="sky"] .form-tabs-list.sticky-top,
+html[data-theme-mode="sky"] .form-tabs-list[data-sticky] {
+    position: static !important;
+}
+
+/* Parent containers should not keep the tab row pinned */
+html[data-theme-mode="sky"] .form-layout,
+html[data-theme-mode="sky"] .form-page,
+html[data-theme-mode="sky"] .layout-main-section {
+    overflow: visible !important;
 }
