@@ -1282,3 +1282,25 @@ html[data-theme-mode="sky"] .form-page,
 html[data-theme-mode="sky"] .layout-main-section {
     overflow: visible !important;
 }
+/* =========================================================
+   SKY THEME - KEEP PAGE HEADER FIXED WHILE SCROLLING
+   ========================================================= */
+
+html[data-theme-mode="sky"] .page-head {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+    background: #ffffff !important;
+}
+
+/* Keep the header content above the scrolling page */
+html[data-theme-mode="sky"] .page-head .page-head-content {
+    position: relative !important;
+    z-index: 1001 !important;
+}
+
+/* Prevent page content from appearing over the header */
+html[data-theme-mode="sky"] .layout-main-section {
+    position: relative !important;
+    z-index: 1 !important;
+}
