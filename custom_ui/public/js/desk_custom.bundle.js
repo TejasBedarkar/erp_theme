@@ -1,9 +1,19 @@
+// Ace renders editable text into plain divs, so a tag check alone lets the
+// rewrite reach what a user typed - for example the Source Text of a Translation,
+// where the stored value then becomes impossible to read back.
+const EDITABLE_SELECTOR = 'textarea, input, [contenteditable="true"], .ace-editor-target';
+
+function isEditable(node) {
+    return !!node.parentElement?.closest(EDITABLE_SELECTOR);
+}
+
 function replaceBranding(root) {
     if (!root) return;
 
     if (root.nodeType === Node.TEXT_NODE) {
         const parentTag = root.parentElement?.tagName;
         if (!root.nodeValue || ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parentTag)) return;
+        if (isEditable(root)) return;
         root.nodeValue = root.nodeValue.replace(/ERPNext/g, 'MagnaERP').replace(/Frappe/g, 'Magna');
         return;
     }
