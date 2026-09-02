@@ -22,6 +22,7 @@ app_include_js = [
 	# "branding.js", 
 	# "magna_login.js",
 	"/assets/custom_ui/js/list_view.js",
+	"/assets/custom_ui/js/task_work.bundle.js"
 ]
 
 web_include_css = [
@@ -31,3 +32,7 @@ web_include_css = [
 web_include_js = [
     "/assets/custom_ui/js/magna_login.js",
 ]
+
+doctype_list_js = {
+    "task_work": "public/js/task_work.bundle.js"
+}

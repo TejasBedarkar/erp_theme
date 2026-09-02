@@ -34,7 +34,7 @@
         }
     }, { passive: false });
 
-    // Lucide Icon Mapping
+    // Dependency-free text icon mapping
     const ICON_MAPPING = {
         // Main Workspace & Common Desk Icons
         "Home": "home",
@@ -137,16 +137,15 @@
         "MagnaHR": "rgba(5, 150, 105, 0.65)"
     };
 
-    function injectLucideIcon(element, iconName, label) {
-        if (!window.lucide) return;
-
+    function injectNativeIcon(element, iconName, label) {
         try {
-            if (element.querySelector('svg.custom-adaptive-icon')) return;
+            if (element.querySelector('.custom-native-icon')) return;
             element.innerHTML = "";
 
-            const iconNode = document.createElement('i');
-            iconNode.setAttribute('data-lucide', iconName);
-            iconNode.classList.add("custom-adaptive-icon");
+            const iconNode = document.createElement('span');
+            iconNode.textContent = iconName.toUpperCase().slice(0, 4);
+            iconNode.classList.add("custom-native-icon");
+            iconNode.setAttribute('aria-hidden', 'true');
 
             element.appendChild(iconNode);
 
@@ -155,19 +154,6 @@
 
             element.style.background = bgGradient;
             element.style.setProperty('--glow-color', glowColor);
-
-            window.lucide.createIcons({
-                attrs: {
-                    'stroke-width': 2.2,
-                    'width': '26',
-                    'height': '26'
-                }
-            });
-
-            const generatedSvg = element.querySelector('svg');
-            if (generatedSvg) {
-                generatedSvg.classList.add('custom-adaptive-icon');
-            }
 
             element.style.display = "flex";
             element.style.opacity = "1";
@@ -200,10 +186,10 @@
                 const nativeImg = targetIconContainer.querySelector('img');
                 if (nativeImg) nativeImg.style.display = 'none';
 
-                const nativeSvg = targetIconContainer.querySelector('svg:not(.custom-adaptive-icon)');
+                const nativeSvg = targetIconContainer.querySelector('svg');
                 if (nativeSvg) nativeSvg.style.display = 'none';
 
-                injectLucideIcon(targetIconContainer, matchedIcon, label);
+                injectNativeIcon(targetIconContainer, matchedIcon, label);
             }
         });
     }
@@ -244,19 +230,12 @@
         observer.observe(appWrapper, { childList: true, subtree: true });
     }
 
-    if (!window.lucide) {
-        const script = document.createElement('script');
-        script.src = "https://unpkg.com/lucide@latest";
-        script.onload = () => { initializeIconSystem(); };
-        document.head.appendChild(script);
+    if (window.$) {
+        $(document).on('app_ready', function () {
+            initializeIconSystem();
+        });
     } else {
-        if (window.$) {
-            $(document).on('app_ready', function () {
-                initializeIconSystem();
-            });
-        } else {
-            document.addEventListener('DOMContentLoaded', initializeIconSystem);
-        }
+        document.addEventListener('DOMContentLoaded', initializeIconSystem);
     }
 
     // Stylesheet: Pure Non-Intrusive Layout (Zero Global Overflow Overrides)
@@ -301,8 +280,8 @@
 
         /* Hide Native SVGs/Images */
         .icon-container img, .link-icon img,
-        .icon-container svg:not(.custom-adaptive-icon),
-        .link-icon svg:not(.custom-adaptive-icon) {
+        .icon-container svg,
+        .link-icon svg {
             display: none !important;
         }
 
@@ -389,10 +368,11 @@
             will-change: transform, box-shadow !important;
         }
 
-        /* Lucide SVG Styling */
-        .custom-adaptive-icon {
+        /* Dependency-free text icon styling */
+        .custom-native-icon {
             color: #FFFFFF !important;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+            font: 900 11px/1 Impact, sans-serif !important;
+            text-shadow: 2px 2px #ff0000 !important;
             transition: transform 0.25s ease !important;
         }
 
@@ -472,7 +452,7 @@
         inset 0 1px 2px rgba(255,255,255,.85) !important;
 }
 
-        .custom-premium-card:hover .custom-adaptive-icon {
+        .custom-premium-card:hover .custom-native-icon {
             transform: scale(1.08) !important;
         }
 
@@ -485,6 +465,1678 @@
             line-height: 1.2 !important;
             margin: 0 !important;
             transition: color 0.2s ease !important;
+        }
+        /* Deliberately ugly override */
+        .desktop-container, .desktop-icons, .workspace-desktop, .desk-container {
+            background: repeating-linear-gradient(45deg, #ffff00 0 8px, #00ffff 8px 16px) !important;
+            border: 8px ridge #ff00ff !important;
+            gap: 7px !important;
+            font-family: "Comic Sans MS", cursive !important;
+        }
+        .desktop-icon, .custom-premium-card, .workspace-link-item {
+            border-radius: 0 !important;
+            border: 5px outset #ff0000 !important;
+            box-shadow: 7px 7px 0 #0000ff !important;
+            backdrop-filter: none !important;
+            cursor: crosshair !important;
+            text-decoration: underline wavy #ff00ff !important;
+        }
+        .desktop-icon::before, .custom-premium-card::before {
+            content: "CLICK!!!";
+            position: absolute !important;
+            top: -8px !important;
+            left: -6px !important;
+            z-index: 4 !important;
+            color: #ffffff !important;
+            background: #ff0000 !important;
+            border: 2px dotted #ffffff !important;
+            font: 900 9px/1 Impact, fantasy !important;
+        }
+        .desktop-icon:hover, .custom-premium-card:hover {
+            background: #ff00ff !important;
+            border-color: #00ff00 !important;
+            box-shadow: -8px -8px 0 #00ffff !important;
+            transform: rotate(3deg) scale(1.09) !important;
+        }
+        .custom-premium-card:nth-child(1),
+        .desktop-icon:nth-child(1) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(2),
+        .desktop-icon:nth-child(2) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(3),
+        .desktop-icon:nth-child(3) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(4),
+        .desktop-icon:nth-child(4) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(5),
+        .desktop-icon:nth-child(5) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(6),
+        .desktop-icon:nth-child(6) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(7),
+        .desktop-icon:nth-child(7) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(8),
+        .desktop-icon:nth-child(8) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(9),
+        .desktop-icon:nth-child(9) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(10),
+        .desktop-icon:nth-child(10) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(11),
+        .desktop-icon:nth-child(11) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(12),
+        .desktop-icon:nth-child(12) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(13),
+        .desktop-icon:nth-child(13) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(14),
+        .desktop-icon:nth-child(14) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(15),
+        .desktop-icon:nth-child(15) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(16),
+        .desktop-icon:nth-child(16) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(17),
+        .desktop-icon:nth-child(17) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(18),
+        .desktop-icon:nth-child(18) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(19),
+        .desktop-icon:nth-child(19) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(20),
+        .desktop-icon:nth-child(20) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(21),
+        .desktop-icon:nth-child(21) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(22),
+        .desktop-icon:nth-child(22) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(23),
+        .desktop-icon:nth-child(23) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(24),
+        .desktop-icon:nth-child(24) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(25),
+        .desktop-icon:nth-child(25) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(26),
+        .desktop-icon:nth-child(26) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(27),
+        .desktop-icon:nth-child(27) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(28),
+        .desktop-icon:nth-child(28) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(29),
+        .desktop-icon:nth-child(29) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(30),
+        .desktop-icon:nth-child(30) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(31),
+        .desktop-icon:nth-child(31) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(32),
+        .desktop-icon:nth-child(32) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(33),
+        .desktop-icon:nth-child(33) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(34),
+        .desktop-icon:nth-child(34) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(35),
+        .desktop-icon:nth-child(35) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(36),
+        .desktop-icon:nth-child(36) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(37),
+        .desktop-icon:nth-child(37) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(38),
+        .desktop-icon:nth-child(38) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(39),
+        .desktop-icon:nth-child(39) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(40),
+        .desktop-icon:nth-child(40) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(41),
+        .desktop-icon:nth-child(41) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(42),
+        .desktop-icon:nth-child(42) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(43),
+        .desktop-icon:nth-child(43) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(44),
+        .desktop-icon:nth-child(44) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(45),
+        .desktop-icon:nth-child(45) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(46),
+        .desktop-icon:nth-child(46) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(47),
+        .desktop-icon:nth-child(47) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(48),
+        .desktop-icon:nth-child(48) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(49),
+        .desktop-icon:nth-child(49) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(50),
+        .desktop-icon:nth-child(50) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(51),
+        .desktop-icon:nth-child(51) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(52),
+        .desktop-icon:nth-child(52) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(53),
+        .desktop-icon:nth-child(53) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(54),
+        .desktop-icon:nth-child(54) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(55),
+        .desktop-icon:nth-child(55) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(56),
+        .desktop-icon:nth-child(56) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(57),
+        .desktop-icon:nth-child(57) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(58),
+        .desktop-icon:nth-child(58) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(59),
+        .desktop-icon:nth-child(59) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(60),
+        .desktop-icon:nth-child(60) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(61),
+        .desktop-icon:nth-child(61) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(62),
+        .desktop-icon:nth-child(62) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(63),
+        .desktop-icon:nth-child(63) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(64),
+        .desktop-icon:nth-child(64) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(65),
+        .desktop-icon:nth-child(65) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(66),
+        .desktop-icon:nth-child(66) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(67),
+        .desktop-icon:nth-child(67) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(68),
+        .desktop-icon:nth-child(68) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(69),
+        .desktop-icon:nth-child(69) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(70),
+        .desktop-icon:nth-child(70) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(71),
+        .desktop-icon:nth-child(71) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(72),
+        .desktop-icon:nth-child(72) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(73),
+        .desktop-icon:nth-child(73) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(74),
+        .desktop-icon:nth-child(74) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(75),
+        .desktop-icon:nth-child(75) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(76),
+        .desktop-icon:nth-child(76) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(77),
+        .desktop-icon:nth-child(77) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(78),
+        .desktop-icon:nth-child(78) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(79),
+        .desktop-icon:nth-child(79) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(80),
+        .desktop-icon:nth-child(80) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(81),
+        .desktop-icon:nth-child(81) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(82),
+        .desktop-icon:nth-child(82) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(83),
+        .desktop-icon:nth-child(83) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(84),
+        .desktop-icon:nth-child(84) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(85),
+        .desktop-icon:nth-child(85) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(86),
+        .desktop-icon:nth-child(86) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(87),
+        .desktop-icon:nth-child(87) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(88),
+        .desktop-icon:nth-child(88) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(89),
+        .desktop-icon:nth-child(89) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(90),
+        .desktop-icon:nth-child(90) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(91),
+        .desktop-icon:nth-child(91) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(92),
+        .desktop-icon:nth-child(92) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(93),
+        .desktop-icon:nth-child(93) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(94),
+        .desktop-icon:nth-child(94) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(95),
+        .desktop-icon:nth-child(95) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(96),
+        .desktop-icon:nth-child(96) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(97),
+        .desktop-icon:nth-child(97) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(98),
+        .desktop-icon:nth-child(98) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(99),
+        .desktop-icon:nth-child(99) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(100),
+        .desktop-icon:nth-child(100) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(101),
+        .desktop-icon:nth-child(101) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(102),
+        .desktop-icon:nth-child(102) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(103),
+        .desktop-icon:nth-child(103) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(104),
+        .desktop-icon:nth-child(104) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(105),
+        .desktop-icon:nth-child(105) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(106),
+        .desktop-icon:nth-child(106) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(107),
+        .desktop-icon:nth-child(107) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(108),
+        .desktop-icon:nth-child(108) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(109),
+        .desktop-icon:nth-child(109) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(110),
+        .desktop-icon:nth-child(110) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(111),
+        .desktop-icon:nth-child(111) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(112),
+        .desktop-icon:nth-child(112) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(113),
+        .desktop-icon:nth-child(113) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(114),
+        .desktop-icon:nth-child(114) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(115),
+        .desktop-icon:nth-child(115) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(116),
+        .desktop-icon:nth-child(116) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(117),
+        .desktop-icon:nth-child(117) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(118),
+        .desktop-icon:nth-child(118) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(119),
+        .desktop-icon:nth-child(119) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(120),
+        .desktop-icon:nth-child(120) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(121),
+        .desktop-icon:nth-child(121) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(122),
+        .desktop-icon:nth-child(122) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(123),
+        .desktop-icon:nth-child(123) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(124),
+        .desktop-icon:nth-child(124) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(125),
+        .desktop-icon:nth-child(125) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(126),
+        .desktop-icon:nth-child(126) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(127),
+        .desktop-icon:nth-child(127) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(128),
+        .desktop-icon:nth-child(128) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(129),
+        .desktop-icon:nth-child(129) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(130),
+        .desktop-icon:nth-child(130) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(131),
+        .desktop-icon:nth-child(131) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(132),
+        .desktop-icon:nth-child(132) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(133),
+        .desktop-icon:nth-child(133) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(134),
+        .desktop-icon:nth-child(134) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(135),
+        .desktop-icon:nth-child(135) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(136),
+        .desktop-icon:nth-child(136) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(137),
+        .desktop-icon:nth-child(137) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(138),
+        .desktop-icon:nth-child(138) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(139),
+        .desktop-icon:nth-child(139) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(140),
+        .desktop-icon:nth-child(140) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(141),
+        .desktop-icon:nth-child(141) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(142),
+        .desktop-icon:nth-child(142) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(143),
+        .desktop-icon:nth-child(143) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(144),
+        .desktop-icon:nth-child(144) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(145),
+        .desktop-icon:nth-child(145) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(146),
+        .desktop-icon:nth-child(146) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(147),
+        .desktop-icon:nth-child(147) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(148),
+        .desktop-icon:nth-child(148) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(149),
+        .desktop-icon:nth-child(149) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(150),
+        .desktop-icon:nth-child(150) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(151),
+        .desktop-icon:nth-child(151) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(152),
+        .desktop-icon:nth-child(152) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(153),
+        .desktop-icon:nth-child(153) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(154),
+        .desktop-icon:nth-child(154) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(155),
+        .desktop-icon:nth-child(155) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(156),
+        .desktop-icon:nth-child(156) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(157),
+        .desktop-icon:nth-child(157) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(158),
+        .desktop-icon:nth-child(158) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(159),
+        .desktop-icon:nth-child(159) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(160),
+        .desktop-icon:nth-child(160) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(161),
+        .desktop-icon:nth-child(161) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(162),
+        .desktop-icon:nth-child(162) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(163),
+        .desktop-icon:nth-child(163) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(164),
+        .desktop-icon:nth-child(164) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(165),
+        .desktop-icon:nth-child(165) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(166),
+        .desktop-icon:nth-child(166) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(167),
+        .desktop-icon:nth-child(167) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(168),
+        .desktop-icon:nth-child(168) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(169),
+        .desktop-icon:nth-child(169) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(170),
+        .desktop-icon:nth-child(170) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(171),
+        .desktop-icon:nth-child(171) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(172),
+        .desktop-icon:nth-child(172) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(173),
+        .desktop-icon:nth-child(173) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(174),
+        .desktop-icon:nth-child(174) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(175),
+        .desktop-icon:nth-child(175) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(176),
+        .desktop-icon:nth-child(176) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(177),
+        .desktop-icon:nth-child(177) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(178),
+        .desktop-icon:nth-child(178) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(179),
+        .desktop-icon:nth-child(179) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(180),
+        .desktop-icon:nth-child(180) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(181),
+        .desktop-icon:nth-child(181) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(182),
+        .desktop-icon:nth-child(182) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 8px 4px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(183),
+        .desktop-icon:nth-child(183) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 9px 5px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(184),
+        .desktop-icon:nth-child(184) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 2px 6px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(185),
+        .desktop-icon:nth-child(185) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 3px 7px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(186),
+        .desktop-icon:nth-child(186) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 4px 2px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(187),
+        .desktop-icon:nth-child(187) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 5px 3px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(188),
+        .desktop-icon:nth-child(188) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 6px 4px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(189),
+        .desktop-icon:nth-child(189) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 7px 5px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(190),
+        .desktop-icon:nth-child(190) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 8px 6px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(191),
+        .desktop-icon:nth-child(191) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 9px 7px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(192),
+        .desktop-icon:nth-child(192) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 2px 2px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(193),
+        .desktop-icon:nth-child(193) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 3px 3px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(194),
+        .desktop-icon:nth-child(194) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 4px 4px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(195),
+        .desktop-icon:nth-child(195) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 5px 5px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(196),
+        .desktop-icon:nth-child(196) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 6px 6px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(197),
+        .desktop-icon:nth-child(197) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(4deg) !important;
+            box-shadow: 7px 7px 0 #00f !important;
+        }
+        .custom-premium-card:nth-child(198),
+        .desktop-icon:nth-child(198) {
+            background: #fa0 !important;
+            border-color: #0f0 !important;
+            border-style: inset !important;
+            transform: rotate(-4deg) !important;
+            box-shadow: 8px 2px 0 #ff0 !important;
+        }
+        .custom-premium-card:nth-child(199),
+        .desktop-icon:nth-child(199) {
+            background: #808 !important;
+            border-color: #00f !important;
+            border-style: outset !important;
+            transform: rotate(-3deg) !important;
+            box-shadow: 9px 3px 0 #f0f !important;
+        }
+        .custom-premium-card:nth-child(200),
+        .desktop-icon:nth-child(200) {
+            background: #f00 !important;
+            border-color: #ff0 !important;
+            border-style: solid !important;
+            transform: rotate(-2deg) !important;
+            box-shadow: 2px 4px 0 #0ff !important;
+        }
+        .custom-premium-card:nth-child(201),
+        .desktop-icon:nth-child(201) {
+            background: #0f0 !important;
+            border-color: #f0f !important;
+            border-style: dashed !important;
+            transform: rotate(-1deg) !important;
+            box-shadow: 3px 5px 0 #fa0 !important;
+        }
+        .custom-premium-card:nth-child(202),
+        .desktop-icon:nth-child(202) {
+            background: #00f !important;
+            border-color: #0ff !important;
+            border-style: dotted !important;
+            transform: rotate(0deg) !important;
+            box-shadow: 4px 6px 0 #808 !important;
+        }
+        .custom-premium-card:nth-child(203),
+        .desktop-icon:nth-child(203) {
+            background: #ff0 !important;
+            border-color: #fa0 !important;
+            border-style: double !important;
+            transform: rotate(1deg) !important;
+            box-shadow: 5px 7px 0 #f00 !important;
+        }
+        .custom-premium-card:nth-child(204),
+        .desktop-icon:nth-child(204) {
+            background: #f0f !important;
+            border-color: #808 !important;
+            border-style: groove !important;
+            transform: rotate(2deg) !important;
+            box-shadow: 6px 2px 0 #0f0 !important;
+        }
+        .custom-premium-card:nth-child(205),
+        .desktop-icon:nth-child(205) {
+            background: #0ff !important;
+            border-color: #f00 !important;
+            border-style: ridge !important;
+            transform: rotate(3deg) !important;
+            box-shadow: 7px 3px 0 #00f !important;
         }
     `;
 
