@@ -68,13 +68,16 @@ class OrbController {
     }
 
     /**
-     * Cancel the animation loop. Call when the orb is removed from the DOM
-     * or the app is torn down, to prevent orphaned RAF loops.
+     * Cancel the animation loop and free the WebGL context. Call when the
+     * orb is removed from the DOM or the app is torn down.
      */
     destroy() {
         if (this._rafId !== null) {
             cancelAnimationFrame(this._rafId);
             this._rafId = null;
+        }
+        if (this.scene) {
+            this.scene.dispose();
         }
     }
     

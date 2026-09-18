@@ -15,49 +15,25 @@ import "./orb.css";
 // API_BASE_URL now lives in ChatArea.jsx (top of the file) — edit it
 // there and it applies here too.
 
-// Web Speech occasionally joins short words or drops a letter, especially
-// with Indian-English accents. Keep this deliberately conservative so ERP
-// names, item codes and customer names are never "corrected" unexpectedly.
-const normalizeTranscript = (value = "") => {
-  const phraseFixes = [
-    [/\bi\s*can\b/gi, "I can"],
-    [/\bi\s*cannot\b/gi, "I cannot"],
-    [/\bi\s*am\b/gi, "I am"],
-    [/\bi\s*will\b/gi, "I will"],
-    [/\bi\s*want\b/gi, "I want"],
-    [/\bhllo\b/gi, "hello"],
-    [/\bhelo\b/gi, "hello"],
-    [/\bplese\b/gi, "please"],
-    [/\bpleas\b/gi, "please"],
-    [/\bshowme\b/gi, "show me"],
-    [/\btellme\b/gi, "tell me"],
-  ];
+const CAPTURE_WORKLET_URL =
+  "/assets/custom_ui/js/magna_ai_assistant/audio/pcm-worklet-processor.js";
 
-  let text = String(value).replace(/\s+/g, " ").trim();
-  phraseFixes.forEach(([pattern, replacement]) => {
-    text = text.replace(pattern, replacement);
-  });
-  text = text.replace(/\s+([,?.!])/g, "$1").trim();
-  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
-};
+let _workletPreloadPromise = null;
 
-const _normalizeForEchoCheck = (value = "") =>
-  String(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-// True when `candidate` (what the mic just heard) looks like the mic picking
-// up `spoken` (what the assistant itself just said) rather than real user
-// speech. Only flags multi-word matches so short replies like "yes"/"ok"
-// always pass through untouched.
-const isLikelyTtsEcho = (candidate, spoken) => {
-  const c = _normalizeForEchoCheck(candidate);
-  const s = _normalizeForEchoCheck(spoken);
-  if (!c || !s) return false;
-  if (c.split(" ").filter(Boolean).length < 3) return false;
-  return s.includes(c);
+const preloadVoiceWorklet = () => {
+  if (_workletPreloadPromise) return _workletPreloadPromise;
+  _workletPreloadPromise = (async () => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      await ctx.audioWorklet.addModule(CAPTURE_WORKLET_URL);
+      await ctx.close().catch(() => {});
+    } catch (e) {
+      _workletPreloadPromise = null;
+      console.warn("[MAGMA VOICE] Worklet preload failed:", e);
+    }
+  })();
+  return _workletPreloadPromise;
 };
 
 // Helper to resolve current Frappe Desk logged-in user and session cookie (sid)
@@ -167,29 +143,6 @@ const normalizeAssistantReply = (value = "") => {
     .trim();
 };
 
-const getRecognizedText = (result) => {
-  const alternatives = Array.from(result || []);
-  if (!alternatives.length) return "";
-
-  // Prefer a clean alternative when its confidence is close to the first
-  // result. This makes maxAlternatives useful instead of blindly accepting
-  // a high-confidence but visibly broken token such as "hllo" or "ican".
-  const suspicious =
-    /\b(?:hllo|helo|plese|pleas|ican|icannot|iam|iwill|iwant|showme|tellme)\b/i;
-  const best = alternatives.reduce((winner, alternative) => {
-    const confidence = Number.isFinite(alternative.confidence)
-      ? alternative.confidence
-      : 0;
-    const score =
-      confidence - (suspicious.test(alternative.transcript || "") ? 0.25 : 0);
-    return !winner || score > winner.score ? { alternative, score } : winner;
-  }, null)?.alternative;
-
-  return normalizeTranscript(
-    best?.transcript || alternatives[0]?.transcript || "",
-  );
-};
-
 // The API normally returns { reply: string }, but keeping this boundary
 // defensive prevents accidental [object Object] or raw response JSON in chat.
 const getReplyText = (payload) => {
@@ -251,6 +204,39 @@ const MicIcon = ({ isListening }) => (
     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
     <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
     <line x1="12" x2="12" y1="19" y2="22" />
+  </svg>
+);
+
+const VoiceMicIcon = ({ muted, color }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: "block" }}
+    aria-hidden="true"
+  >
+    {muted ? (
+      <>
+        <line x1="2" x2="22" y1="2" y2="22" />
+        <path d="M18.89 13.23A7 7 0 0 0 19 11v-1" />
+        <path d="M5 10v1a7 7 0 0 0 12 0" />
+        <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" />
+        <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
+        <line x1="12" x2="12" y1="19" y2="22" />
+      </>
+    ) : (
+      <>
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+        <line x1="12" x2="12" y1="19" y2="22" />
+      </>
+    )}
   </svg>
 );
 
@@ -652,13 +638,26 @@ const MAGNA_PREMIUM_STYLES = `
 const LiveVoiceWidget = ({
   isVoiceModeOpen,
   voiceStatusLabel,
+  voiceStatusHint,
   voiceStatus,
   voiceError,
   voiceConnected,
+  micMuted,
   handleOrbTap,
-  connectVoice,
-  disconnectVoice,
-}) => (
+  toggleMicMute,
+}) => {
+  const muteTitle = micMuted
+    ? "Unmute mic"
+    : "Mute mic — stop capturing without ending the session";
+  const accent = micMuted ? "#64748b" : "#f59e0b";
+  const statusColor =
+    voiceStatus === "speaking"
+      ? "var(--primary-color, #6366f1)"
+      : voiceStatus === "thinking"
+        ? "var(--primary-color, #6366f1)"
+        : "var(--text-color, #0f172a)";
+
+  return (
   <AnimatePresence>
     {isVoiceModeOpen && (
       <motion.div
@@ -686,7 +685,7 @@ const LiveVoiceWidget = ({
       >
         <div
           className={
-            voiceStatus === "speaking"
+            voiceStatus === "speaking" || voiceStatus === "thinking"
               ? "magna-orb-wrap magna-orb-speaking"
               : "magna-orb-wrap"
           }
@@ -716,57 +715,56 @@ const LiveVoiceWidget = ({
             style={{
               fontSize: "13px",
               fontWeight: "650",
-              color:
-                voiceStatus === "speaking"
-                  ? "var(--primary-color, #6366f1)"
-                  : "var(--text-color, #0f172a)",
+              color: statusColor,
             }}
           >
             {voiceError ? "Error" : voiceStatusLabel}
           </div>
-          {voiceError && (
+          {(voiceStatusHint || voiceError) && (
             <div
               style={{
                 fontSize: "11px",
-                color: "#ef4444",
+                color: voiceError ? "#ef4444" : "var(--text-muted, #64748b)",
                 marginTop: "1px",
                 lineHeight: 1.4,
               }}
             >
-              {voiceError}
+              {voiceError || voiceStatusHint}
             </div>
           )}
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={voiceConnected ? disconnectVoice : connectVoice}
-          title={voiceConnected ? "Disconnect" : "Connect"}
-          style={{
-            border:
-              "1px solid color-mix(in srgb, " +
-              (voiceConnected ? "#f59e0b" : "var(--primary-color, #6366f1)") +
-              " 25%, transparent)",
-            borderRadius: "999px",
-            cursor: "pointer",
-            padding: "6px 13px",
-            flexShrink: 0,
-            fontSize: "11px",
-            fontWeight: "700",
-            color: voiceConnected ? "#f59e0b" : "var(--primary-color, #6366f1)",
-            backgroundColor:
-              "color-mix(in srgb, " +
-              (voiceConnected ? "#f59e0b" : "var(--primary-color, #6366f1)") +
-              " 10%, transparent)",
-          }}
-        >
-          {voiceConnected ? "Disconnect" : "Connect"}
-        </motion.button>
+        {voiceConnected && (
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={toggleMicMute}
+            title={muteTitle}
+            aria-label={muteTitle}
+            style={{
+              border:
+                "1px solid color-mix(in srgb, " + accent + " 25%, transparent)",
+              borderRadius: "999px",
+              cursor: "pointer",
+              padding: "7px",
+              flexShrink: 0,
+              color: accent,
+              backgroundColor:
+                "color-mix(in srgb, " + accent + " 10%, transparent)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 0,
+            }}
+          >
+            <VoiceMicIcon muted={micMuted} color={accent} />
+          </motion.button>
+        )}
       </motion.div>
     )}
   </AnimatePresence>
-);
+  );
+};
 
 export default function AssistantPortal({ isOpen, onClose }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -799,6 +797,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState("idle"); // idle | connecting | listening | thinking | speaking | error
   const [voiceConnected, setVoiceConnected] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
   const [micPermission, setMicPermission] = useState("prompt"); // prompt | granted | denied
   const [voiceError, setVoiceError] = useState("");
   const [voiceEvents, setVoiceEvents] = useState([]);
@@ -814,14 +813,30 @@ export default function AssistantPortal({ isOpen, onClose }) {
   // bubble in chat (interim STT results update it live) or needs one.
   const voiceDraftMessageRef = useRef(false);
   const orbRef = useRef(null);
-  const speechRecognitionRef = useRef(null);
-  // Web Speech TTS: queue of utterances waiting to be spoken
-  const ttsQueueRef = useRef([]);
+
+  // ---- Mic capture (getUserMedia -> AudioWorklet -> binary WS frames) ----
+  const micStreamRef = useRef(null);
+  const micMutedRef = useRef(false);
+  const captureAudioContextRef = useRef(null);
+  const workletNodeRef = useRef(null);
+  const micAnalyserRef = useRef(null);
+  const micLevelRafRef = useRef(null);
+
+  // ---- Playback (binary WS frames -> AudioBufferSourceNode queue) ----
+  const playbackAudioContextRef = useRef(null);
+  // Feeds a real <audio> element so the mic's echo cancellation can actually hear and cancel the assistant's own voice.
+  const playbackDestinationRef = useRef(null);
+  const playbackAudioElRef = useRef(null);
+  const nextStartTimeRef = useRef(0);
+  const scheduledNodesRef = useRef(new Set());
   const ttsSpeakingRef = useRef(false);
-  const ttsInterruptedRef = useRef(false);
-  // No getUserMedia AEC -- used to filter mic-picked-up self-echo of TTS output.
-  const recentTtsTextRef = useRef("");
-  const recentTtsClearTimerRef = useRef(null);
+  const activeTtsTurnIdRef = useRef(0);
+  const lastInterruptedTurnIdRef = useRef(0);
+  // True from final_transcript until done/interrupted — keeps status in sync
+  // when TTS and tool calls overlap.
+  const voiceTurnActiveRef = useRef(false);
+  const voiceReadyRef = useRef(false);
+  const pendingMicChunksRef = useRef([]);
 
   const activeChat = chatHistory.find((c) => c.id === currentChatId);
   const activeMessages = activeChat ? activeChat.messages : messages;
@@ -947,6 +962,21 @@ export default function AssistantPortal({ isOpen, onClose }) {
       nextMsgs[lastIdx] = updater(nextMsgs[lastIdx]);
       const next = [...prev];
       next[idx] = { ...next[idx], messages: nextMsgs };
+      return next;
+    });
+  };
+
+  // Drops the live draft bubble when the STT result behind it turned out to
+  // be noise/breath, not a real sentence, so it doesn't sit stuck in the chat.
+  const removeLastUserDraftMessage = (chatId) => {
+    setChatHistory((prev) => {
+      const idx = prev.findIndex((c) => c.id === chatId);
+      if (idx === -1) return prev;
+      const msgs = prev[idx].messages;
+      const lastIdx = msgs.length - 1;
+      if (lastIdx < 0 || msgs[lastIdx].sender !== "user") return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], messages: msgs.slice(0, lastIdx) };
       return next;
     });
   };
@@ -1220,121 +1250,94 @@ export default function AssistantPortal({ isOpen, onClose }) {
     }
   };
 
-  // ---- Web Speech TTS helpers ----
+  // ---- Playback of streamed OpenAI TTS audio (PCM16/24kHz binary WS frames) ----
 
-  const pickTtsVoice = () => {
-    const voices = window.speechSynthesis?.getVoices() || [];
+  const PLAYBACK_SAMPLE_RATE = 24000;
+  const pendingAudioCountRef = useRef(0);
+  const awaitingMoreAudioRef = useRef(false);
 
-    // 1. Natural-sounding voices first (Samantha is macOS's best default English voice)
-    let bestVoice = voices.find(
-      (v) =>
-        v.name.includes("Samantha") ||
-        v.name.includes("Google US English") ||
-        v.name.includes("Microsoft Aria") ||
-        v.name.includes("Karen") ||
-        v.name.includes("Moira"),
-    );
-
-    // 2. Known Indian voices, for when Samantha etc. aren't installed
-    if (!bestVoice) {
-      bestVoice = voices.find(
-        (v) =>
-          v.name.includes("Rishi") ||
-          v.name.includes("Veena") ||
-          v.name.includes("Microsoft Heera") ||
-          v.name.includes("Microsoft Ravi") ||
-          (v.name.includes("Google") && v.lang.includes("IN")),
-      );
+  const ensurePlaybackContext = () => {
+    if (!playbackAudioContextRef.current) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      playbackAudioContextRef.current = ctx;
+      playbackDestinationRef.current = ctx.createMediaStreamDestination();
+      const audioEl = new Audio();
+      audioEl.autoplay = true;
+      audioEl.srcObject = playbackDestinationRef.current.stream;
+      audioEl.style.display = "none";
+      document.body.appendChild(audioEl);
+      audioEl.play().catch(() => {});
+      playbackAudioElRef.current = audioEl;
     }
-
-    // 3. Fallback to generic en-IN language code
-    if (!bestVoice) {
-      bestVoice = voices.find((v) => v.lang === "en-IN" || v.lang === "en_IN");
-    }
-
-    // 4. Fallback to British English (handles Indian names better than US English)
-    if (!bestVoice) {
-      bestVoice = voices.find((v) => v.lang === "en-GB" || v.lang === "en_GB");
-    }
-
-    // 5. Any English voice
-    if (!bestVoice) {
-      bestVoice = voices.find((v) => v.lang.startsWith("en"));
-    }
-
-    return bestVoice || null;
+    const ctx = playbackAudioContextRef.current;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    return ctx;
   };
 
-  // Drain the TTS sentence queue — called after each utterance ends.
-  const drainTtsQueue = () => {
-    if (ttsInterruptedRef.current) {
-      ttsQueueRef.current = [];
-      ttsSpeakingRef.current = false;
-      return;
-    }
-    if (ttsQueueRef.current.length === 0) {
-      ttsSpeakingRef.current = false;
-      // All speech done — return orb to listening state
-      if (voiceModeOpenRef.current) setVoiceStatus("listening");
-      // Keep the echo buffer alive briefly after speech ends -- mic
-      // pickup of the tail end of TTS can arrive a moment late.
-      if (recentTtsClearTimerRef.current)
-        clearTimeout(recentTtsClearTimerRef.current);
-      recentTtsClearTimerRef.current = setTimeout(() => {
-        recentTtsTextRef.current = "";
-      }, 2000);
-      return;
-    }
-    const text = ttsQueueRef.current.shift();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
-    const voice = pickTtsVoice();
-    // Match lang to the chosen voice -- forcing en-IN while using a US
-    // voice like Samantha makes some browsers ignore the voice choice.
-    utterance.lang = voice ? voice.lang : "en-IN";
-    if (voice) utterance.voice = voice;
-    // Keep utterance in memory to prevent Chrome's garbage collection bug from killing it before onend fires
-    window._activeUtterances = window._activeUtterances || [];
-    window._activeUtterances.push(utterance);
+  // Browsers suspend AudioContexts after idle/TTS; worklet then stops and
+  // the UI can still say Listening while no mic audio is sent.
+  const ensureCaptureContextRunning = () => {
+    const ctx = captureAudioContextRef.current;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  };
 
-    utterance.onstart = () => {
-      setVoiceStatus("speaking");
-      console.log("[MAGMA VOICE] TTS speaking:", text.slice(0, 80));
-      if (recentTtsClearTimerRef.current) {
-        clearTimeout(recentTtsClearTimerRef.current);
-        recentTtsClearTimerRef.current = null;
-      }
-      recentTtsTextRef.current = `${recentTtsTextRef.current} ${text}`
-        .trim()
-        .split(/\s+/)
-        .slice(-80)
-        .join(" ");
-    };
-    utterance.onend = () => {
-      window._activeUtterances = window._activeUtterances.filter(
-        (u) => u !== utterance,
-      );
-      drainTtsQueue();
-    };
-    utterance.onerror = (e) => {
-      window._activeUtterances = window._activeUtterances.filter(
-        (u) => u !== utterance,
-      );
-      console.error("[MAGMA VOICE] TTS error:", e.error);
-      drainTtsQueue();
-    };
+  // Stops and clears every currently scheduled/playing audio node --
+  // used on manual tap, a server 'interrupted' event, and every
+  // "this session is going away" exit path.
+  const stopPlayback = () => {
+    for (const node of scheduledNodesRef.current) {
+      try {
+        node.stop();
+        node.disconnect();
+      } catch (e) {}
+    }
+    scheduledNodesRef.current.clear();
+    pendingAudioCountRef.current = 0;
+    awaitingMoreAudioRef.current = false;
+    nextStartTimeRef.current = 0;
+    ttsSpeakingRef.current = false;
+  };
+
+  // Schedules one incoming PCM16LE chunk for gapless back-to-back playback.
+  // Drops audio belonging to a turn that's already been interrupted --
+  // cancelling the backend task doesn't un-send bytes already in flight.
+  const schedulePcmChunk = (arrayBuffer, turnId) => {
+    if (turnId <= lastInterruptedTurnIdRef.current) return;
+    const ctx = ensurePlaybackContext();
+    const int16 = new Int16Array(arrayBuffer);
+    const float32 = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 0x8000;
+
+    const buffer = ctx.createBuffer(1, float32.length, PLAYBACK_SAMPLE_RATE);
+    buffer.copyToChannel(float32, 0);
+
+    const node = ctx.createBufferSource();
+    node.buffer = buffer;
+    node.connect(playbackDestinationRef.current);
+
+    const startAt = Math.max(nextStartTimeRef.current, ctx.currentTime);
+    node.start(startAt);
+    nextStartTimeRef.current = startAt + buffer.duration;
+
+    scheduledNodesRef.current.add(node);
+    pendingAudioCountRef.current += 1;
     ttsSpeakingRef.current = true;
-    window.speechSynthesis.speak(utterance);
-  };
+    setVoiceStatus("speaking");
 
-  // Queue a sentence for low-latency streaming speech.
-  const speakSentence = (text) => {
-    const clean = (text || "").trim();
-    if (!clean) return;
-    ttsInterruptedRef.current = false;
-    ttsQueueRef.current.push(clean);
-    if (!ttsSpeakingRef.current) drainTtsQueue();
+    node.onended = () => {
+      scheduledNodesRef.current.delete(node);
+      pendingAudioCountRef.current = Math.max(
+        0,
+        pendingAudioCountRef.current - 1,
+      );
+      if (pendingAudioCountRef.current === 0 && !awaitingMoreAudioRef.current) {
+        ttsSpeakingRef.current = false;
+        if (!voiceModeOpenRef.current) return;
+        setVoiceStatus(voiceTurnActiveRef.current ? "thinking" : "listening");
+      }
+    };
   };
 
   // ---- Mic level analyser (kept for the orb animation) ----
@@ -1360,16 +1363,11 @@ export default function AssistantPortal({ isOpen, onClose }) {
   };
 
   // Stops whatever the assistant is currently saying — used on manual tap,
-  // a server-sent 'interrupted' event, client-side barge-in detection, and
-  // every "this session is going away" exit path below (closing the
-  // portal, switching chats, unmounting). Closing the AudioContext outright
-  // (rather than just clearing a queue) guarantees every already-scheduled
+  // a server-sent 'interrupted' event, and every "this session is going
+  // away" exit path below (closing the portal, switching chats, unmounting).
   const interruptSpeech = () => {
     console.log("[MAGMA VOICE] interruptSpeech");
-    ttsInterruptedRef.current = true;
-    ttsSpeakingRef.current = false;
-    ttsQueueRef.current = [];
-    window.speechSynthesis?.cancel();
+    stopPlayback();
     streamingReplyRef.current = "";
     if (
       voiceModeOpenRef.current &&
@@ -1381,12 +1379,18 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   const stopMicAnalyser = () => {
     setMicLevel(0);
+    if (micLevelRafRef.current) {
+      cancelAnimationFrame(micLevelRafRef.current);
+      micLevelRafRef.current = null;
+    }
+    if (micAnalyserRef.current) micAnalyserRef.current = null;
   };
 
   // ----------------------------------------------------------------
-  // Pure Web Speech API Voice Implementation
-  // No getUserMedia is used, as it conflicts with SpeechRecognition on some OS.
-  // Barge-in is triggered instantly by STT interim results.
+  // OpenAI-audio Voice Implementation
+  // getUserMedia -> AudioWorklet -> binary WS frames (mic, PCM16/24kHz)
+  // binary WS frames -> AudioBufferSourceNode queue (assistant speech)
+  // Barge-in is triggered by the backend's server-side VAD.
   // ----------------------------------------------------------------
 
   const handleVoiceEvent = (event) => {
@@ -1409,13 +1413,6 @@ export default function AssistantPortal({ isOpen, onClose }) {
     if (type === "partial_transcript") {
       setVoiceStatus("listening");
 
-      // Barge-in: STT heard you speak while TTS is playing!
-      if (ttsSpeakingRef.current) {
-        console.log("[MAGMA VOICE] Barge-in via STT interim!");
-        interruptSpeech();
-        voiceSocketRef.current?.send(JSON.stringify({ type: "interrupt" }));
-      }
-
       // Grow a draft user bubble live in chat -- the typing effect comes
       // straight from the real, growing STT text, not a separate preview.
       if (text) {
@@ -1428,15 +1425,44 @@ export default function AssistantPortal({ isOpen, onClose }) {
           // finalize whatever bot reply was still streaming first or it
           // gets silently orphaned (frozen mid-stream, tools stop updating).
           updateLastBotMessage(chatId, (msg) => ({ ...msg, streaming: false }));
-          appendMessage(chatId, { sender: "user", text, voiceOrigin: true, streaming: true });
+          appendMessage(chatId, {
+            sender: "user",
+            text,
+            voiceOrigin: true,
+            streaming: true,
+          });
           voiceDraftMessageRef.current = true;
         }
       }
+    } else if (type === "transcript_discarded") {
+      // Backend decided the last utterance was noise/breath, not a real
+      // sentence -- drop the draft bubble instead of leaving it stuck.
+      if (voiceDraftMessageRef.current && voiceChatIdRef.current) {
+        removeLastUserDraftMessage(voiceChatIdRef.current);
+      }
+      voiceDraftMessageRef.current = false;
+      if (voiceModeOpenRef.current) setVoiceStatus("listening");
     } else if (type === "final_transcript") {
+      // Stop any still-playing/queued reply so it doesn't overlap the next turn.
+      if (
+        pendingAudioCountRef.current > 0 ||
+        ttsSpeakingRef.current ||
+        awaitingMoreAudioRef.current
+      ) {
+        lastInterruptedTurnIdRef.current = Math.max(
+          lastInterruptedTurnIdRef.current,
+          activeTtsTurnIdRef.current,
+        );
+        stopPlayback();
+      }
       if (text) {
         const chatId = createVoiceChat();
         if (voiceDraftMessageRef.current) {
-          updateLastUserMessage(chatId, (msg) => ({ ...msg, text, streaming: false }));
+          updateLastUserMessage(chatId, (msg) => ({
+            ...msg,
+            text,
+            streaming: false,
+          }));
         } else {
           appendMessage(chatId, { sender: "user", text, voiceOrigin: true });
         }
@@ -1446,23 +1472,37 @@ export default function AssistantPortal({ isOpen, onClose }) {
           tools: [],
           streaming: true,
           streamed: true,
+          voiceOrigin: true,
         });
       }
       voiceDraftMessageRef.current = false;
+      voiceTurnActiveRef.current = true;
       setVoiceStatus("thinking");
       streamingReplyRef.current = "";
     } else if (type === "token") {
       streamingReplyRef.current += text;
-      setVoiceStatus("speaking");
+      // Status stays thinking until PCM actually plays (schedulePcmChunk).
       if (voiceChatIdRef.current) {
         updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
           ...msg,
           text: streamingReplyRef.current,
         }));
       }
-    } else if (type === "voice_sentence") {
-      // Server sent a clean, speech-ready sentence — speak it now
-      speakSentence(text);
+    } else if (type === "tts_chunk_start") {
+      activeTtsTurnIdRef.current = event.turn_id;
+      awaitingMoreAudioRef.current = true;
+    } else if (type === "tts_chunk_end") {
+      awaitingMoreAudioRef.current = false;
+      if (pendingAudioCountRef.current === 0) {
+        ttsSpeakingRef.current = false;
+        if (!voiceModeOpenRef.current) {
+          /* closed */
+        } else if (voiceTurnActiveRef.current) {
+          setVoiceStatus("thinking");
+        } else {
+          setVoiceStatus("listening");
+        }
+      }
     } else if (type === "tool_call") {
       const toolObj = {
         name: event.name || event.tool_name,
@@ -1470,7 +1510,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
         status: "running",
         result: null,
       };
-      setVoiceStatus("thinking");
+      if (!ttsSpeakingRef.current && pendingAudioCountRef.current === 0) {
+        setVoiceStatus("thinking");
+      }
       if (voiceChatIdRef.current) {
         updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
           ...msg,
@@ -1478,7 +1520,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
         }));
       }
     } else if (type === "tool_result") {
-      setVoiceStatus("thinking");
+      if (!ttsSpeakingRef.current && pendingAudioCountRef.current === 0) {
+        setVoiceStatus("thinking");
+      }
       if (voiceChatIdRef.current) {
         updateLastBotMessage(voiceChatIdRef.current, (msg) => {
           const tools = [...(msg.tools || [])];
@@ -1495,6 +1539,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
         });
       }
     } else if (type === "interrupted") {
+      voiceTurnActiveRef.current = false;
+      if (typeof event.turn_id === "number") {
+        lastInterruptedTurnIdRef.current = Math.max(
+          lastInterruptedTurnIdRef.current,
+          event.turn_id,
+        );
+      }
       interruptSpeech();
       if (voiceChatIdRef.current) {
         updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
@@ -1504,219 +1555,94 @@ export default function AssistantPortal({ isOpen, onClose }) {
         }));
       }
     } else if (type === "done") {
+      voiceTurnActiveRef.current = false;
       streamingReplyRef.current = "";
-      // Status will be set to 'listening' when the TTS queue drains
+      // Status goes listening once scheduled audio finishes
       if (voiceChatIdRef.current) {
         updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
           ...msg,
           streaming: false,
         }));
       }
+      if (
+        pendingAudioCountRef.current === 0 &&
+        !awaitingMoreAudioRef.current &&
+        voiceModeOpenRef.current
+      ) {
+        setVoiceStatus("listening");
+      }
     } else if (type === "error") {
-      setVoiceError(
-        text || data.message || "The voice server reported an error.",
-      );
+      voiceTurnActiveRef.current = false;
+      voiceReadyRef.current = false;
+      setVoiceError(text || "The voice server reported an error.");
       setVoiceStatus("error");
+    } else if (type === "ready") {
+      voiceReadyRef.current = true;
+      const pending = pendingMicChunksRef.current;
+      pendingMicChunksRef.current = [];
+      const socket = voiceSocketRef.current;
+      if (socket?.readyState === WebSocket.OPEN) {
+        for (const chunk of pending) {
+          try {
+            socket.send(chunk);
+          } catch (e) {}
+        }
+      }
+      setVoiceConnected(true);
+      setVoiceStatus("listening");
+      addVoiceEvent("ready");
+    } else if (type === "status" && event.status === "connecting") {
+      setVoiceStatus("connecting");
     }
   };
 
   const connectVoice = async () => {
     if (voiceModeOpenRef.current && voiceConnected) return;
 
-    // ----------------------------------------------------------------
-    // 1. Start SpeechRecognition IMMEDIATELY synchronously.
-    // If we await anything before this, the browser will lose the "user gesture"
-    // and silently block the microphone permission prompt for STT!
-    // ----------------------------------------------------------------
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      if (speechRecognitionRef.current) {
-        try {
-          speechRecognitionRef.current.stop();
-        } catch (e) {}
-      }
+    // Each connection gets its own fresh turn_id count on the backend.
+    activeTtsTurnIdRef.current = 0;
+    lastInterruptedTurnIdRef.current = 0;
+    voiceTurnActiveRef.current = false;
+    voiceReadyRef.current = false;
+    pendingMicChunksRef.current = [];
+    micMutedRef.current = false;
+    setMicMuted(false);
+    setVoiceStatus("connecting");
 
-      const recognition = new SpeechRecognition();
-      recognition.lang = SPEECH_RECOGNITION_LANGUAGE;
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 3;
+    ensurePlaybackContext();
+    preloadVoiceWorklet();
 
-      recognition.onresult = (event) => {
-        let interim = "";
-        let final = "";
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript;
-          } else {
-            interim += event.results[i][0].transcript;
-          }
-        }
-
-        if (interim) {
-          const cleanInterim = interim.trim();
-          if (cleanInterim) {
-            handleVoiceEvent({ type: "partial_transcript", text: interim });
-            // Barge-in Heuristic: Ignore tiny breathing artifacts < 3 characters,
-            // and ignore the mic picking up the assistant's own TTS output.
-            if (
-              ttsSpeakingRef.current &&
-              cleanInterim.length > 2 &&
-              !isLikelyTtsEcho(cleanInterim, recentTtsTextRef.current)
-            ) {
-              console.log(
-                "[MAGMA VOICE] Barge-in via STT interim!",
-                cleanInterim,
-              );
-              interruptSpeech();
-              voiceSocketRef.current?.send(
-                JSON.stringify({ type: "interrupt" }),
-              );
-            }
-          }
-        }
-        if (final) {
-          const cleanText = getRecognizedText([
-            { transcript: final, confidence: 1 },
-          ]);
-
-          // Final STT Heuristic: Ignore pure punctuation/noise artifacts (breathing/fans)
-          const isNoiseArtifact =
-            !cleanText ||
-            cleanText.trim().length <= 1 ||
-            /^[^a-zA-Z0-9]+$/.test(cleanText.trim());
-          if (isNoiseArtifact) {
-            console.log(
-              "[MAGMA VOICE] Ignored noise/breathing artifact:",
-              final,
-            );
-            return;
-          }
-
-          // The mic (no echo cancellation) can pick up the assistant's own
-          // recently-spoken TTS output and misreport it as new user speech.
-          if (isLikelyTtsEcho(cleanText, recentTtsTextRef.current)) {
-            console.log(
-              "[MAGMA VOICE] Ignored likely TTS self-echo:",
-              cleanText,
-            );
-            return;
-          }
-
-          if (
-            !voiceSocketRef.current ||
-            voiceSocketRef.current.readyState !== WebSocket.OPEN
-          ) {
-            console.warn(
-              "[MAGMA VOICE] Dropping transcript because WebSocket is not open yet.",
-            );
-            return;
-          }
-          console.log("[MAGMA VOICE] STT final transcript:", cleanText);
-
-          // 1. Cancel the OLD bot message locally if we are barging in.
-          // Only "speaking" counts -- during "thinking" nothing is playing
-          // yet to interrupt, so a final result landing here is far more
-          // likely a duplicate/late STT segment of the same utterance than
-          // a deliberate new command, and wiping the in-flight reply for it
-          // was losing real answers.
-          if (voiceStatusRef.current === "speaking") {
-            interruptSpeech();
-            if (voiceChatIdRef.current) {
-              updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
-                ...msg,
-                streaming: false,
-                text: msg.text ? msg.text : "You interrupted before I could respond.",
-              }));
-            }
-          }
-
-          // 2. handleVoiceEvent adds the NEW user text + NEW bot placeholder to the UI
-          handleVoiceEvent({ type: "final_transcript", text: cleanText });
-
-          // 3. Send the transcript to the server (which cleanly cancels the server's old task automatically)
-          voiceSocketRef.current.send(
-            JSON.stringify({ type: "user_speech", text: cleanText }),
-          );
-        }
-      };
-
-      recognition.onaudiostart = () => setMicLevel(0.4);
-      recognition.onsoundstart = () => setMicLevel(0.7);
-      recognition.onspeechstart = () => setMicLevel(1.0);
-      recognition.onspeechend = () => setMicLevel(0.4);
-      recognition.onsoundend = () => setMicLevel(0.1);
-      recognition.onaudioend = () => setMicLevel(0);
-
-      recognition.onerror = (e) => {
-        console.warn("[MAGMA VOICE] SpeechRecognition error:", e.error);
-        if (e.error !== "no-speech" && e.error !== "aborted") {
-          setVoiceError("Speech recognition error: " + e.error);
-        }
-      };
-
-      // .start() called right inside .onend can throw a transient
-      // InvalidStateError before the browser's recognition service has
-      // fully released the previous session -- without a retry here,
-      // that one failed attempt permanently kills listening (the UI still
-      // says "Listening..." since that's separate React state).
-      const restartRecognition = (attempt = 0) => {
-        if (!voiceModeOpenRef.current || !speechRecognitionRef.current) return;
-        try {
-          speechRecognitionRef.current.start();
-        } catch (e) {
-          if (attempt < 5) {
-            setTimeout(() => restartRecognition(attempt + 1), 250 * (attempt + 1));
-          } else {
-            console.warn("[MAGMA VOICE] restart failed after retries:", e);
-            setVoiceError("Microphone stopped listening. Tap Disconnect then Connect to resume.");
-          }
-        }
-      };
-
-      recognition.onend = () => restartRecognition();
-
-      speechRecognitionRef.current = recognition;
-      try {
-        recognition.start();
-        setMicPermission("granted");
-      } catch (e) {
-        console.warn("[MAGMA VOICE] Synchronous STT start failed:", e);
-      }
-    } else {
-      setVoiceError("Dictation is not supported in this browser.");
-    }
-
-    // ----------------------------------------------------------------
-    // 2. Preload voices (async)
-    // ----------------------------------------------------------------
-    if (
-      window.speechSynthesis &&
-      window.speechSynthesis.getVoices().length === 0
-    ) {
-      await new Promise((resolve) => {
-        window.speechSynthesis.onvoiceschanged = resolve;
-        setTimeout(resolve, 1000);
-      });
-    }
-
-    // CRITICAL: Use the same session_id as the current text chat so Voice and
-    // Chat share a single conversation history in the backend DB.
-    // Previously this generated a random UUID which created a completely
-    // separate history thread — context was always lost on Voice↔Chat switches.
     const chatSessionId = currentChatId || `voice-${Date.now()}`;
     const sessionId = chatSessionId;
     voiceSessionIdRef.current = sessionId;
     createVoiceChat(sessionId);
+
+    // Start mic + session together; open WS as soon as session resolves so
+    // OpenAI STT handshake overlaps getUserMedia / worklet load.
+    const micPromise = navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+      },
+    });
+    let sessionCtx;
+    try {
+      sessionCtx = await resolveFrappeSessionContext();
+    } catch (e) {
+      console.warn("[MAGMA VOICE] session resolve failed:", e);
+      setVoiceError("Could not resolve your Frappe session.");
+      setVoiceStatus("error");
+      return;
+    }
 
     const voiceParams = new URLSearchParams({ session_id: sessionId });
     const {
       user: frappeUser,
       sid: frappeSid,
       csrfToken: frappeCsrf,
-    } = await resolveFrappeSessionContext();
+    } = sessionCtx;
     if (frappeUser) voiceParams.append("user_id", frappeUser);
     if (frappeSid) voiceParams.append("sid", frappeSid);
     if (frappeCsrf) voiceParams.append("csrf_token", frappeCsrf);
@@ -1727,29 +1653,20 @@ export default function AssistantPortal({ isOpen, onClose }) {
     const socket = new WebSocket(
       `${hostUrl}/ws/voice?${voiceParams.toString()}`,
     );
+    socket.binaryType = "arraybuffer";
     voiceSocketRef.current = socket;
 
     socket.onopen = () => {
       console.log("[MAGMA VOICE] WebSocket OPEN:", socket.url);
+      ensureCaptureContextRunning();
       setVoiceConnected(true);
-      setVoiceStatus("listening");
+      setVoiceStatus("connecting");
       addVoiceEvent("connected", sessionId);
-      if (speechRecognitionRef.current) {
-        try {
-          speechRecognitionRef.current.start();
-        } catch (e) {
-          console.warn("[MAGMA VOICE] SpeechRecognition.start() failed:", e);
-        }
-      }
     };
 
     socket.onmessage = (message) => {
-      // No binary frames expected — server sends only JSON text events now
-      if (typeof message.data !== "string") {
-        console.warn(
-          "[MAGMA VOICE] Unexpected binary frame ignored, size:",
-          message.data?.byteLength,
-        );
+      if (message.data instanceof ArrayBuffer) {
+        schedulePcmChunk(message.data, activeTtsTurnIdRef.current);
         return;
       }
       try {
@@ -1771,32 +1688,117 @@ export default function AssistantPortal({ isOpen, onClose }) {
       console.log(
         `[MAGMA VOICE] WebSocket CLOSED: code=${evt.code} reason="${evt.reason}" wasClean=${evt.wasClean}`,
       );
+      voiceReadyRef.current = false;
+      pendingMicChunksRef.current = [];
       setVoiceConnected(false);
       if (voiceSocketRef.current === socket) voiceSocketRef.current = null;
       if (voiceModeOpenRef.current) setVoiceStatus("idle");
       addVoiceEvent("disconnected");
     };
+
+    let stream;
+    try {
+      stream = await micPromise;
+      micStreamRef.current = stream;
+      setMicPermission("granted");
+    } catch (e) {
+      console.warn("[MAGMA VOICE] getUserMedia failed:", e);
+      setMicPermission("denied");
+      setVoiceError("Microphone access was blocked. Allow it and try again.");
+      setVoiceStatus("error");
+      try {
+        socket.close(1000, "mic denied");
+      } catch (err) {}
+      return;
+    }
+
+    const captureCtx = new (window.AudioContext || window.webkitAudioContext)();
+    captureAudioContextRef.current = captureCtx;
+    try {
+      await Promise.all([
+        captureCtx.state === "suspended"
+          ? captureCtx.resume().catch(() => {})
+          : Promise.resolve(),
+        captureCtx.audioWorklet.addModule(CAPTURE_WORKLET_URL),
+      ]);
+    } catch (e) {
+      console.error("[MAGMA VOICE] Failed to load capture worklet:", e);
+      setVoiceError("Could not start the microphone processor.");
+      setVoiceStatus("error");
+      return;
+    }
+
+    const micSource = captureCtx.createMediaStreamSource(micStreamRef.current);
+    const workletNode = new AudioWorkletNode(
+      captureCtx,
+      "pcm-worklet-processor",
+    );
+    workletNode.port.onmessage = (msg) => {
+      if (micMutedRef.current) return;
+      ensureCaptureContextRunning();
+      const sock = voiceSocketRef.current;
+      if (!sock || sock.readyState !== WebSocket.OPEN) return;
+      if (!voiceReadyRef.current) {
+        const buf = pendingMicChunksRef.current;
+        buf.push(msg.data);
+        if (buf.length > 40) buf.shift();
+        return;
+      }
+      sock.send(msg.data);
+    };
+    micSource.connect(workletNode);
+    workletNodeRef.current = workletNode;
+
+    const analyser = captureCtx.createAnalyser();
+    analyser.fftSize = 256;
+    micSource.connect(analyser);
+    micAnalyserRef.current = analyser;
+    const levelBuf = new Uint8Array(analyser.frequencyBinCount);
+    const tickMicLevel = () => {
+      if (!micAnalyserRef.current) return;
+      micAnalyserRef.current.getByteTimeDomainData(levelBuf);
+      let sum = 0;
+      for (let i = 0; i < levelBuf.length; i++) {
+        const v = (levelBuf[i] - 128) / 128;
+        sum += v * v;
+      }
+      setMicLevel(Math.min(1, Math.sqrt(sum / levelBuf.length) * 4));
+      micLevelRafRef.current = requestAnimationFrame(tickMicLevel);
+    };
+    tickMicLevel();
   };
 
   const disconnectVoice = () => {
     stopMicAnalyser();
-    if (speechRecognitionRef.current) {
+    voiceReadyRef.current = false;
+    pendingMicChunksRef.current = [];
+    micMutedRef.current = false;
+    setMicMuted(false);
+    if (workletNodeRef.current) {
       try {
-        speechRecognitionRef.current.stop();
+        workletNodeRef.current.disconnect();
       } catch (e) {}
-      speechRecognitionRef.current = null;
+      workletNodeRef.current = null;
     }
-    ttsInterruptedRef.current = true;
-    ttsQueueRef.current = [];
-    ttsSpeakingRef.current = false;
-    window.speechSynthesis?.cancel();
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+    if (muteFlushTimerRef.current) {
+      clearInterval(muteFlushTimerRef.current);
+      muteFlushTimerRef.current = null;
+    }
+    if (captureAudioContextRef.current) {
+      captureAudioContextRef.current.close().catch(() => {});
+      captureAudioContextRef.current = null;
+    }
+    stopPlayback();
 
-    // Clean up any hanging thinking state before disconnecting
+    // Finalize any in-flight bot bubble without inventing an interrupt message.
     if (voiceChatIdRef.current) {
       updateLastBotMessage(voiceChatIdRef.current, (msg) => ({
         ...msg,
         streaming: false,
-        text: msg.text ? msg.text : "You interrupted before I could respond.",
       }));
     }
 
@@ -1807,14 +1809,65 @@ export default function AssistantPortal({ isOpen, onClose }) {
     setVoiceConnected(false);
     setVoiceStatus("idle");
   };
+
+  const muteFlushTimerRef = useRef(null);
+
+  const flushSttAfterMute = () => {
+    const socket = voiceSocketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    try {
+      socket.send(JSON.stringify({ type: "flush_stt" }));
+    } catch (e) {}
+    // Also push silence so server_vad can close the turn if commit is rejected.
+    const sampleRate = 24000;
+    const chunkMs = 50;
+    const samples = Math.round((sampleRate * chunkMs) / 1000);
+    let left = 16;
+    if (muteFlushTimerRef.current) clearInterval(muteFlushTimerRef.current);
+    muteFlushTimerRef.current = setInterval(() => {
+      if (!micMutedRef.current || !voiceSocketRef.current || left <= 0) {
+        clearInterval(muteFlushTimerRef.current);
+        muteFlushTimerRef.current = null;
+        return;
+      }
+      if (voiceSocketRef.current.readyState === WebSocket.OPEN) {
+        voiceSocketRef.current.send(new Int16Array(samples).buffer);
+      }
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(muteFlushTimerRef.current);
+        muteFlushTimerRef.current = null;
+      }
+    }, chunkMs);
+  };
+
+  const toggleMicMute = () => {
+    if (!voiceConnected) return;
+    const next = !micMutedRef.current;
+    micMutedRef.current = next;
+    setMicMuted(next);
+    if (micStreamRef.current) {
+      micStreamRef.current.getAudioTracks().forEach((t) => {
+        t.enabled = !next;
+      });
+    }
+    if (next) {
+      setMicLevel(0);
+      flushSttAfterMute();
+    } else if (muteFlushTimerRef.current) {
+      clearInterval(muteFlushTimerRef.current);
+      muteFlushTimerRef.current = null;
+    }
+  };
   const openVoiceMode = () => {
     if (voiceModeOpenRef.current) return;
     voiceModeOpenRef.current = true;
     setIsVoiceModeOpen(true);
     voiceDraftMessageRef.current = false;
     setVoiceEvents([]);
-    // This is called directly from the assistant-button click, so browser
-    // microphone and AudioContext permission prompts are gesture-safe.
+    setVoiceStatus("connecting");
+    preloadVoiceWorklet();
+    // Called from the voice-button click — mic/AudioContext stay gesture-safe.
     connectVoice();
   };
 
@@ -1828,7 +1881,17 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   const handleOrbTap = () => {
     if (voiceStatus === "speaking") {
+      lastInterruptedTurnIdRef.current = Math.max(
+        lastInterruptedTurnIdRef.current,
+        activeTtsTurnIdRef.current,
+      );
       interruptSpeech();
+      const socket = voiceSocketRef.current;
+      if (socket?.readyState === WebSocket.OPEN) {
+        try {
+          socket.send(JSON.stringify({ type: "interrupt" }));
+        } catch (e) {}
+      }
       addVoiceEvent("interrupted", "manual");
     } else if (!voiceConnected) {
       connectVoice();
@@ -1837,7 +1900,18 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   useEffect(() => {
     voiceStatusRef.current = voiceStatus;
+    if (voiceStatus === "listening") ensureCaptureContextRunning();
   }, [voiceStatus]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && voiceModeOpenRef.current) {
+        ensureCaptureContextRunning();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   useEffect(() => {
     if (isVoiceModeOpen) {
@@ -1857,12 +1931,38 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (orbRef.current) {
-      orbRef.current.setState(voiceStatus);
+      const orbState =
+        voiceStatus === "connecting" || voiceStatus === "error"
+          ? "idle"
+          : voiceStatus;
+      orbRef.current.setState(orbState);
     }
   }, [voiceStatus]);
 
-  // Keep the newest spoken/streamed line visible without moving the orb or
+  // Keep the orb alive while muted / thinking (no mic level otherwise).
   useEffect(() => {
+    if (!orbRef.current || !isVoiceModeOpen) return;
+    let raf = 0;
+    const tick = () => {
+      if (!orbRef.current) return;
+      let level = micLevel;
+      if (voiceStatus === "thinking") {
+        level = 0.28 + 0.12 * Math.sin(performance.now() / 280);
+      } else if (voiceStatus === "speaking") {
+        level = Math.max(level, 0.45);
+      } else if (micMuted) {
+        level = 0.05;
+      }
+      orbRef.current.setAudioLevel(level);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isVoiceModeOpen, voiceStatus, micLevel, micMuted]);
+
+  // Warm the capture worklet HTTP cache while the portal is open.
+  useEffect(() => {
+    if (isOpen) preloadVoiceWorklet();
     if (!isOpen && voiceModeOpenRef.current) closeVoiceMode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
@@ -1889,13 +1989,23 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const activeSessionLabel = activeChat ? activeChat.title : "New session";
 
   const voiceStatusLabel = {
-    idle: "Tap Connect to start",
+    idle: "Starting…",
     connecting: "Connecting…",
     listening: "Listening…",
-    thinking: "Thinking…",
+    thinking: "Working on your request…",
     speaking: "Speaking…",
     error: "Voice connection error",
   }[voiceStatus];
+
+  const voiceStatusHint = micMuted
+    ? voiceStatus === "thinking" || voiceStatus === "speaking"
+      ? "Mic muted — reply continues. Unmute to interrupt."
+      : "Mic muted — unmute when you want to talk"
+    : voiceStatus === "thinking"
+      ? "Searching and updating ERP…"
+      : voiceStatus === "speaking"
+        ? "Tap the orb to interrupt"
+        : "";
 
   // Animated File Badges Component
   const RenderFileBadges = () => {
@@ -2432,12 +2542,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
                     <LiveVoiceWidget
                       isVoiceModeOpen={isVoiceModeOpen}
                       voiceStatusLabel={voiceStatusLabel}
+                      voiceStatusHint={voiceStatusHint}
                       voiceStatus={voiceStatus}
                       voiceError={voiceError}
                       voiceConnected={voiceConnected}
+                      micMuted={micMuted}
                       handleOrbTap={handleOrbTap}
-                      connectVoice={connectVoice}
-                      disconnectVoice={disconnectVoice}
+                      toggleMicMute={toggleMicMute}
                     />
 
                     {/* Seamless Input Bar */}
@@ -2724,12 +2835,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
                       <LiveVoiceWidget
                         isVoiceModeOpen={isVoiceModeOpen}
                         voiceStatusLabel={voiceStatusLabel}
+                        voiceStatusHint={voiceStatusHint}
                         voiceStatus={voiceStatus}
                         voiceError={voiceError}
                         voiceConnected={voiceConnected}
+                        micMuted={micMuted}
                         handleOrbTap={handleOrbTap}
-                        connectVoice={connectVoice}
-                        disconnectVoice={disconnectVoice}
+                        toggleMicMute={toggleMicMute}
                       />
                       <div
                         className="magna-input-shell"
@@ -2929,5 +3041,6 @@ export default function AssistantPortal({ isOpen, onClose }) {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>  );
+    </AnimatePresence>
+  );
 }

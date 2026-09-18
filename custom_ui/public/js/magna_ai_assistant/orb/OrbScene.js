@@ -47,8 +47,9 @@ class OrbScene {
         this.clock = new THREE.Clock();
         
         // Handle resize
+        this._boundResize = this.resize.bind(this);
         this.resize();
-        window.addEventListener('resize', this.resize.bind(this));
+        window.addEventListener('resize', this._boundResize);
     }
     
     resize() {
@@ -83,6 +84,17 @@ class OrbScene {
         this.mesh.rotation.y = elapsedTime * 0.15;
         
         this.renderer.render(this.scene, this.camera);
+    }
+
+    // Frees the GPU/WebGL context and removes the resize listener --
+    // without this, reopening voice mode repeatedly leaks a WebGL
+    // context each time until the browser refuses to create new ones.
+    dispose() {
+        window.removeEventListener('resize', this._boundResize);
+        this.geometry.dispose();
+        this.material.dispose();
+        this.renderer.dispose();
+        this.renderer.forceContextLoss();
     }
 }
 
