@@ -157,6 +157,31 @@ function SpeakerOffIcon({ size = 14 }) {
     );
 }
 
+function SparkleIcon({ size = 12 }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287L12 3Z" />
+        </svg>
+    );
+}
+
+// The bot's visual identity in the message list -- a gradient mark instead
+// of a plain dot, so an AI reply reads as distinctly "AI" at a glance.
+function AgentAvatar({ size = 22 }) {
+    return (
+        <div style={{
+            width: size, height: size, borderRadius: '50%', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, var(--primary-color, #6366f1), color-mix(in srgb, var(--primary-color, #6366f1) 55%, #a855f7))',
+            boxShadow: '0 0 10px color-mix(in srgb, var(--primary-color, #6366f1) 45%, transparent)',
+        }}>
+            <span style={{ color: '#fff', display: 'flex' }}>
+                <SparkleIcon size={Math.round(size * 0.55)} />
+            </span>
+        </div>
+    );
+}
+
 function StopIcon({ size = 14 }) {
     return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -924,10 +949,30 @@ function ToolActivityPanel({ tools = [] }) {
     );
 }
 
-function LiveThinkingDots({ label = 'Magna AI is thinking' }) {
+// Rotating set the "thinking" indicators cycle through instead of one static line.
+const THINKING_PHRASES = [
+    'Magna AI is thinking',
+    'Looking into that',
+    'Working on it',
+    'One moment',
+    'Putting it together',
+];
+
+function useRotatingPhrase(phrases, intervalMs = 2200) {
+    const [index, setIndex] = useState(0);
+    useEffect(() => {
+        const id = setInterval(() => setIndex((i) => (i + 1) % phrases.length), intervalMs);
+        return () => clearInterval(id);
+    }, [phrases, intervalMs]);
+    return phrases[index];
+}
+
+function LiveThinkingDots({ label }) {
+    const rotating = useRotatingPhrase(THINKING_PHRASES);
+    const text = label ?? rotating;
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-color, #0f172a)' }}>{label}</span>
+            <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-color, #0f172a)' }}>{text}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {[0, 1, 2].map((dot) => (
                     <motion.span
@@ -946,6 +991,7 @@ export { ToolIcon, ToolStatusIndicator, ToolCallChip, ToolActivityPanel, LiveThi
 
 // AI Thinking Indicator
 function ThinkingIndicator() {
+    const thinkingText = useRotatingPhrase(THINKING_PHRASES);
     return (
         <motion.div
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -957,10 +1003,7 @@ function ThinkingIndicator() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', maxWidth: '82%', gap: '6px' }}>
                 {/* Thinking Sender Meta */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 4px' }}>
-                    <span style={{
-                        width: '6px', height: '6px', borderRadius: '50%',
-                        backgroundColor: 'var(--primary-color, #6366f1)', boxShadow: '0 0 8px var(--primary-color, #6366f1)'
-                    }} />
+                    <AgentAvatar size={20} />
                     <span style={{ fontSize: '11.5px', fontWeight: '650', color: 'var(--text-muted, #64748b)', letterSpacing: '-0.1px' }}>
                         Magna System Agent
                     </span>
@@ -986,7 +1029,7 @@ function ThinkingIndicator() {
                     gap: '10px'
                 }}>
                     <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-color, #0f172a)' }}>
-                        Magna AI is thinking
+                        {thinkingText}
                     </span>
 
                     {/* Pulsing Dots Animation */}
@@ -1173,12 +1216,7 @@ export default function ChatArea({ messages = [], isThinking, onSuggestionClick 
                                 }}>
                                     {/* Sender Meta Info */}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 4px' }}>
-                                        {!isUser && (
-                                            <span style={{
-                                                width: '6px', height: '6px', borderRadius: '50%',
-                                                backgroundColor: 'var(--primary-color, #6366f1)', boxShadow: '0 0 8px var(--primary-color, #6366f1)'
-                                            }} />
-                                        )}
+                                        {!isUser && <AgentAvatar size={20} />}
                                         <span style={{ fontSize: '11.5px', fontWeight: '650', color: 'var(--text-muted, #64748b)', letterSpacing: '-0.1px' }}>
                                             {isUser ? 'Workspace Executive' : 'Magna System Agent'}
                                         </span>
@@ -1219,7 +1257,7 @@ export default function ChatArea({ messages = [], isThinking, onSuggestionClick 
 
                                     {/* Message Bubble — solid, theme-adaptive, no blur */}
                                     <div style={{
-                                        padding: '14px 18px',
+                                        padding: '16px 20px',
                                         borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                                         backgroundColor: isUser
                                             ? 'color-mix(in srgb, var(--primary-color, #6366f1) 10%, transparent)'
@@ -1235,7 +1273,7 @@ export default function ChatArea({ messages = [], isThinking, onSuggestionClick 
                                     }}>
                                         <div style={{
                                             fontSize: '13.5px',
-                                            lineHeight: '1.6',
+                                            lineHeight: '1.65',
                                             color: 'var(--text-color, #0f172a)',
                                             letterSpacing: '-0.1px'
                                         }}>
