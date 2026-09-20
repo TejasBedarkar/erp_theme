@@ -12,6 +12,27 @@ import ChatArea, {
 import OrbController from "./orb/OrbController.js";
 import "./orb.css";
 
+// ============================================================
+// ASSISTANT VOICES -- edit this list to add or remove voices.
+// Each line becomes one button in the Live Voice widget.
+//   key   : unique id (saved in localStorage as the selected voice)
+//   label : text on the button
+//   name  : exact browser voice name (see the list printed by
+//           speechSynthesis.getVoices() in the DevTools console)
+//   lang  : voice language code
+//   stt   : language used for LISTENING while this voice is selected
+//   hint  : optional regex used only if `name` is not installed --
+//           matches another voice of the same `lang` by name
+// The first entry is the default. Keep at least one entry.
+// ============================================================
+const TTS_VOICES = [
+  { key: "ukf", label: "UK Female", name: "Google UK English Female", lang: "en-GB", stt: "en-IN", hint: "female" },
+  { key: "ukm", label: "UK Male", name: "Google UK English Male", lang: "en-GB", stt: "en-IN", hint: "(^|[^a-z])male" },
+  { key: "us", label: "US English", name: "Google US English", lang: "en-US", stt: "en-IN", hint: "google" },
+  { key: "hi", label: "हिन्दी", name: "Google हिन्दी", lang: "hi-IN", stt: "hi-IN", hint: "google|hindi|हिन्दी" },
+];
+const TTS_VOICE_STORAGE_KEY = "magna_tts_voice";
+
 // API_BASE_URL now lives in ChatArea.jsx (top of the file) — edit it
 // there and it applies here too.
 
@@ -44,7 +65,9 @@ const normalizeTranscript = (value = "") => {
 const _normalizeForEchoCheck = (value = "") =>
   String(value)
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
+    // strip ASCII/general punctuation and the Devanagari danda, but keep
+    // letters of every script (Hindi etc.) so echo detection still works
+    .replace(/[!-\/:-@\[-`{-~\u2000-\u206f\u0964\u0965]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -646,6 +669,53 @@ const MAGNA_PREMIUM_STYLES = `
 .magna-shell .magna-typing-line::after { content: '|'; margin-left: 1px; animation: magna-typing-cursor 0.9s step-end infinite; }
 `;
 
+// ---- TTS voice lookup (list lives at the top of this file) ----
+// Exact voice name first, then same language + name hint. If nothing
+// matches, pickTtsVoice() falls back to its generic selection so speech
+// never breaks.
+const normLang = (l) => String(l || "").replace("_", "-").toLowerCase();
+
+const findTtsVoiceByKey = (key) => {
+  const def = TTS_VOICES.find((o) => o.key === key);
+  if (!def) return null;
+  const all = window.speechSynthesis?.getVoices() || [];
+  const exact = all.find((v) => v.name === def.name);
+  if (exact) return exact;
+  if (def.hint) {
+    let re = null;
+    try {
+      re = new RegExp(def.hint, "i");
+    } catch (e) {}
+    if (re) {
+      return (
+        all.find(
+          (v) => normLang(v.lang) === normLang(def.lang) && re.test(v.name),
+        ) || null
+      );
+    }
+  }
+  return null;
+};
+
+// Language used for listening while a voice is selected.
+const sttLangFor = (def) =>
+  (def && (def.stt || def.lang)) || SPEECH_RECOGNITION_LANGUAGE;
+
+// Chrome's online Google voices stop mid-way through long utterances, so
+// anything over ~180 chars is split at a space into shorter chunks.
+const splitForTts = (text, max = 180) => {
+  const out = [];
+  let rest = (text || "").trim();
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf(" ", max);
+    if (cut < 40) cut = max;
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
+};
+
 // Top-level (not inline) so its identity is stable across re-renders and the orb-canvas doesn't get torn down.
 // Tool activity and the live-typing transcript are already shown in the chat message itself (see handleVoiceEvent) --
 // this widget only needs to show connection status, not duplicate that content.
@@ -658,6 +728,9 @@ const LiveVoiceWidget = ({
   handleOrbTap,
   connectVoice,
   disconnectVoice,
+  ttsVoiceKey,
+  ttsVoiceAvailable,
+  onSelectTtsVoice,
 }) => (
   <AnimatePresence>
     {isVoiceModeOpen && (
@@ -736,6 +809,44 @@ const LiveVoiceWidget = ({
               {voiceError}
             </div>
           )}
+          <div
+            role="group"
+            aria-label="Assistant voice"
+            style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginTop: "6px" }}
+          >
+            {TTS_VOICES.map((o) => {
+              const active = ttsVoiceKey === o.key;
+              const available = !!ttsVoiceAvailable?.[o.key];
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={!available}
+                  onClick={() => onSelectTtsVoice(o.key)}
+                  title={available ? o.name : `${o.name} is not available in this browser`}
+                  style={{
+                    border:
+                      "1px solid color-mix(in srgb, var(--primary-color, #6366f1) " +
+                      (active ? "60%" : "22%") +
+                      ", transparent)",
+                    borderRadius: "999px",
+                    padding: "2px 9px",
+                    fontSize: "10.5px",
+                    fontWeight: "650",
+                    cursor: available ? "pointer" : "not-allowed",
+                    opacity: available ? 1 : 0.4,
+                    color: active ? "#fff" : "var(--primary-color, #6366f1)",
+                    backgroundColor: active
+                      ? "var(--primary-color, #6366f1)"
+                      : "transparent",
+                  }}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <motion.button
@@ -819,6 +930,21 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const ttsQueueRef = useRef([]);
   const ttsSpeakingRef = useRef(false);
   const ttsInterruptedRef = useRef(false);
+  // Selected voice (persisted) + which of the three exist in this browser.
+  const [ttsVoiceKey, setTtsVoiceKey] = useState(() => {
+    try {
+      const saved = localStorage.getItem(TTS_VOICE_STORAGE_KEY);
+      if (TTS_VOICES.some((o) => o.key === saved)) return saved;
+    } catch (e) {}
+    return TTS_VOICES[0].key;
+  });
+  const [ttsVoiceAvailable, setTtsVoiceAvailable] = useState({});
+  const ttsVoiceKeyRef = useRef(ttsVoiceKey);
+  // Bumped on every interrupt / voice switch so late onend/onerror events
+  // from a cancelled utterance can't advance the queue a second time.
+  const ttsGenRef = useRef(0);
+  // Sentence currently being spoken, so a voice switch can replay it.
+  const ttsCurrentTextRef = useRef("");
   // No getUserMedia AEC -- used to filter mic-picked-up self-echo of TTS output.
   const recentTtsTextRef = useRef("");
   const recentTtsClearTimerRef = useRef(null);
@@ -875,7 +1001,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = SPEECH_RECOGNITION_LANGUAGE || "en-US";
+      recognition.lang = currentSttLang() || "en-US";
 
       recognition.onresult = (event) => {
         let final = "";
@@ -1220,10 +1346,79 @@ export default function AssistantPortal({ isOpen, onClose }) {
     }
   };
 
+  // Voices load late in Chrome -- watch for them and re-check the 3 buttons.
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return undefined;
+    const refresh = () => {
+      const avail = {};
+      TTS_VOICES.forEach((o) => {
+        avail[o.key] = !!findTtsVoiceByKey(o.key);
+      });
+      setTtsVoiceAvailable(avail);
+      return Object.values(avail).some(Boolean);
+    };
+    refresh();
+    synth.addEventListener?.("voiceschanged", refresh);
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (refresh() || tries > 16) clearInterval(timer);
+    }, 250);
+    return () => {
+      clearInterval(timer);
+      synth.removeEventListener?.("voiceschanged", refresh);
+    };
+  }, []);
+
   // ---- Web Speech TTS helpers ----
+
+  const currentSttLang = () =>
+    sttLangFor(TTS_VOICES.find((o) => o.key === ttsVoiceKeyRef.current));
+
+  // Switch voice at any time, even mid-sentence: the sentence being spoken
+  // is replayed in the new voice, queued sentences pick it up automatically.
+  // Listening switches language too (e.g. hi-IN for the Hindi voice).
+  const selectTtsVoice = (key) => {
+    if (key === ttsVoiceKeyRef.current) return;
+    ttsVoiceKeyRef.current = key;
+    setTtsVoiceKey(key);
+    try {
+      localStorage.setItem(TTS_VOICE_STORAGE_KEY, key);
+    } catch (e) {}
+
+    const rec = speechRecognitionRef.current;
+    const sttLang = sttLangFor(TTS_VOICES.find((o) => o.key === key));
+    if (rec && rec.lang !== sttLang) {
+      rec.lang = sttLang;
+      try {
+        // onend -> restartRecognition() starts it again in the new language
+        rec.stop();
+      } catch (e) {}
+    }
+    if (
+      ttsSpeakingRef.current &&
+      ttsCurrentTextRef.current &&
+      !ttsInterruptedRef.current
+    ) {
+      ttsGenRef.current += 1;
+      const myGen = ttsGenRef.current;
+      ttsQueueRef.current.unshift(ttsCurrentTextRef.current);
+      window.speechSynthesis?.cancel();
+      // Chrome drops a speak() issued in the same tick as cancel(). While
+      // waiting, ttsSpeakingRef stays true so new sentences just queue.
+      setTimeout(() => {
+        if (myGen === ttsGenRef.current) drainTtsQueue();
+      }, 60);
+    }
+  };
 
   const pickTtsVoice = () => {
     const voices = window.speechSynthesis?.getVoices() || [];
+
+    // 0. The voice picked in the widget (UK Female / UK Male / US English)
+    const preferred = findTtsVoiceByKey(ttsVoiceKeyRef.current);
+    if (preferred) return preferred;
 
     // 1. Natural-sounding voices first (Samantha is macOS's best default English voice)
     let bestVoice = voices.find(
@@ -1270,10 +1465,12 @@ export default function AssistantPortal({ isOpen, onClose }) {
     if (ttsInterruptedRef.current) {
       ttsQueueRef.current = [];
       ttsSpeakingRef.current = false;
+      ttsCurrentTextRef.current = "";
       return;
     }
     if (ttsQueueRef.current.length === 0) {
       ttsSpeakingRef.current = false;
+      ttsCurrentTextRef.current = "";
       // All speech done — return orb to listening state
       if (voiceModeOpenRef.current) setVoiceStatus("listening");
       // Keep the echo buffer alive briefly after speech ends -- mic
@@ -1286,6 +1483,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
       return;
     }
     const text = ttsQueueRef.current.shift();
+    ttsCurrentTextRef.current = text;
+    const gen = ttsGenRef.current;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
@@ -1299,6 +1498,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
     window._activeUtterances.push(utterance);
 
     utterance.onstart = () => {
+      if (gen !== ttsGenRef.current) return;
       setVoiceStatus("speaking");
       console.log("[MAGMA VOICE] TTS speaking:", text.slice(0, 80));
       if (recentTtsClearTimerRef.current) {
@@ -1315,12 +1515,14 @@ export default function AssistantPortal({ isOpen, onClose }) {
       window._activeUtterances = window._activeUtterances.filter(
         (u) => u !== utterance,
       );
+      if (gen !== ttsGenRef.current) return;
       drainTtsQueue();
     };
     utterance.onerror = (e) => {
       window._activeUtterances = window._activeUtterances.filter(
         (u) => u !== utterance,
       );
+      if (gen !== ttsGenRef.current) return;
       console.error("[MAGMA VOICE] TTS error:", e.error);
       drainTtsQueue();
     };
@@ -1333,7 +1535,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
     const clean = (text || "").trim();
     if (!clean) return;
     ttsInterruptedRef.current = false;
-    ttsQueueRef.current.push(clean);
+    splitForTts(clean).forEach((piece) => ttsQueueRef.current.push(piece));
     if (!ttsSpeakingRef.current) drainTtsQueue();
   };
 
@@ -1366,6 +1568,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   // (rather than just clearing a queue) guarantees every already-scheduled
   const interruptSpeech = () => {
     console.log("[MAGMA VOICE] interruptSpeech");
+    ttsGenRef.current += 1;
     ttsInterruptedRef.current = true;
     ttsSpeakingRef.current = false;
     ttsQueueRef.current = [];
@@ -1538,7 +1741,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       }
 
       const recognition = new SpeechRecognition();
-      recognition.lang = SPEECH_RECOGNITION_LANGUAGE;
+      recognition.lang = currentSttLang();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 3;
@@ -1586,7 +1789,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
           const isNoiseArtifact =
             !cleanText ||
             cleanText.trim().length <= 1 ||
-            /^[^a-zA-Z0-9]+$/.test(cleanText.trim());
+            /^[\s!-\/:-@\[-`{-~\u2000-\u206f\u3000-\u303f]+$/.test(cleanText);
           if (isNoiseArtifact) {
             console.log(
               "[MAGMA VOICE] Ignored noise/breathing artifact:",
@@ -1786,6 +1989,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       } catch (e) {}
       speechRecognitionRef.current = null;
     }
+    ttsGenRef.current += 1;
     ttsInterruptedRef.current = true;
     ttsQueueRef.current = [];
     ttsSpeakingRef.current = false;
@@ -2438,6 +2642,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
                       handleOrbTap={handleOrbTap}
                       connectVoice={connectVoice}
                       disconnectVoice={disconnectVoice}
+                      ttsVoiceKey={ttsVoiceKey}
+                      ttsVoiceAvailable={ttsVoiceAvailable}
+                      onSelectTtsVoice={selectTtsVoice}
                     />
 
                     {/* Seamless Input Bar */}
@@ -2730,6 +2937,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
                         handleOrbTap={handleOrbTap}
                         connectVoice={connectVoice}
                         disconnectVoice={disconnectVoice}
+                        ttsVoiceKey={ttsVoiceKey}
+                        ttsVoiceAvailable={ttsVoiceAvailable}
+                        onSelectTtsVoice={selectTtsVoice}
                       />
                       <div
                         className="magna-input-shell"
