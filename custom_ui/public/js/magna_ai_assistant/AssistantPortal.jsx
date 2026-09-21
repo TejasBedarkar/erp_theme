@@ -832,7 +832,9 @@ const VoicePicker = ({ ttsVoiceKey, ttsVoiceAvailable, onSelectTtsVoice }) => {
               borderRadius: "12px",
               zIndex: 20,
               transformOrigin: "bottom right",
-              background: "var(--card-bg, #ffffff)",
+              backgroundColor: "#ffffff",
+              backgroundImage:
+                "linear-gradient(var(--card-bg, #ffffff), var(--card-bg, #ffffff))",
               border:
                 "1px solid color-mix(in srgb, var(--border-color, rgba(148, 163, 184, 0.4)) 60%, transparent)",
               boxShadow: "0 12px 28px -10px rgba(0, 0, 0, 0.25)",
