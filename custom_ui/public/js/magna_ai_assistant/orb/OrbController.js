@@ -6,8 +6,7 @@ import OrbScene from './OrbScene.js';
  */
 
 class OrbController {
-    constructor() {
-        const canvas = document.getElementById('orb-canvas');
+    constructor(canvas = document.getElementById('orb-canvas')) {
         this.label = document.getElementById('orb-label');
         
         // Ensure THREE is loaded

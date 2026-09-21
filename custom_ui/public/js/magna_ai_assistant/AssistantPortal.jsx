@@ -883,6 +883,26 @@ const VoicePicker = ({ ttsVoiceKey, ttsVoiceAvailable, onSelectTtsVoice }) => {
   );
 };
 
+// The orb lives and dies with its canvas, so it comes back when the widget moves between the home and chat views.
+const OrbCanvas = ({ voiceStatus }) => {
+  const canvasRef = useRef(null);
+  const orbRef = useRef(null);
+
+  useEffect(() => {
+    orbRef.current = new OrbController(canvasRef.current);
+    return () => {
+      orbRef.current?.destroy();
+      orbRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    orbRef.current?.setState(voiceStatus || "idle");
+  }, [voiceStatus]);
+
+  return <canvas id="orb-canvas" ref={canvasRef}></canvas>;
+};
+
 // Top-level (not inline) so its identity is stable across re-renders and the orb-canvas doesn't get torn down.
 // Tool activity and the live-typing transcript are already shown in the chat message itself (see handleVoiceEvent) --
 // this widget only needs to show connection status, not duplicate that content.
@@ -960,7 +980,7 @@ const LiveVoiceWidget = ({
             title={voiceStatus === "speaking" ? "Tap to interrupt" : ""}
             style={{ cursor: "pointer", width: "100%", height: "100%" }}
           >
-            <canvas id="orb-canvas"></canvas>
+            <OrbCanvas voiceStatus={voiceStatus} />
           </div>
         </div>
 
@@ -1070,10 +1090,11 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const voiceStatusRef = useRef("idle");
   const streamingReplyRef = useRef("");
   const voiceChatIdRef = useRef(null);
+  const pendingVoiceTextRef = useRef([]);
+  const recognitionRunningRef = useRef(false);
   // Tracks whether the current user turn already has a growing draft
   // bubble in chat (interim STT results update it live) or needs one.
   const voiceDraftMessageRef = useRef(false);
-  const orbRef = useRef(null);
   const speechRecognitionRef = useRef(null);
   // Web Speech TTS: queue of utterances waiting to be spoken
   const ttsQueueRef = useRef([]);
@@ -1698,7 +1719,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   };
 
   const createVoiceChat = (targetSessionId) => {
-    if (voiceChatIdRef.current) return voiceChatIdRef.current;
+    if (!targetSessionId && voiceChatIdRef.current) return voiceChatIdRef.current;
     if (!currentChatId) {
       setChatHistory((prev) => [
         { id: targetSessionId, title: "Live voice session", messages: [] },
@@ -1965,9 +1986,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
             !voiceSocketRef.current ||
             voiceSocketRef.current.readyState !== WebSocket.OPEN
           ) {
-            console.warn(
-              "[MAGMA VOICE] Dropping transcript because WebSocket is not open yet.",
-            );
+            if (voiceModeOpenRef.current) pendingVoiceTextRef.current.push(cleanText);
             return;
           }
           console.log("[MAGMA VOICE] STT final transcript:", cleanText);
@@ -1999,6 +2018,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
         }
       };
 
+      recognition.onstart = () => {
+        recognitionRunningRef.current = true;
+      };
       recognition.onaudiostart = () => setMicLevel(0.4);
       recognition.onsoundstart = () => setMicLevel(0.7);
       recognition.onspeechstart = () => setMicLevel(1.0);
@@ -2032,7 +2054,10 @@ export default function AssistantPortal({ isOpen, onClose }) {
         }
       };
 
-      recognition.onend = () => restartRecognition();
+      recognition.onend = () => {
+        recognitionRunningRef.current = false;
+        if (speechRecognitionRef.current === recognition) restartRecognition();
+      };
 
       speechRecognitionRef.current = recognition;
       try {
@@ -2062,6 +2087,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
     // Chat share a single conversation history in the backend DB.
     // Previously this generated a random UUID which created a completely
     // separate history thread — context was always lost on Voice↔Chat switches.
+    voiceChatIdRef.current = null;
     const chatSessionId = currentChatId || `voice-${Date.now()}`;
     const sessionId = chatSessionId;
     voiceSessionIdRef.current = sessionId;
@@ -2090,13 +2116,20 @@ export default function AssistantPortal({ isOpen, onClose }) {
       setVoiceConnected(true);
       setVoiceStatus("listening");
       addVoiceEvent("connected", sessionId);
-      if (speechRecognitionRef.current) {
+      // Recognition was started on the click; only a stopped one needs another start.
+      if (speechRecognitionRef.current && !recognitionRunningRef.current) {
         try {
           speechRecognitionRef.current.start();
         } catch (e) {
           console.warn("[MAGMA VOICE] SpeechRecognition.start() failed:", e);
         }
       }
+      // Anything the user said while the socket was still connecting.
+      const queued = pendingVoiceTextRef.current.splice(0);
+      queued.forEach((queuedText) => {
+        handleVoiceEvent({ type: "final_transcript", text: queuedText });
+        socket.send(JSON.stringify({ type: "user_speech", text: queuedText }));
+      });
     };
 
     socket.onmessage = (message) => {
@@ -2135,6 +2168,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
   };
 
   const disconnectVoice = () => {
+    pendingVoiceTextRef.current = [];
+    voiceChatIdRef.current = null;
     micMutedRef.current = false;
     setMicMuted(false);
     stopMicAnalyser();
@@ -2192,6 +2227,12 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   const openVoiceMode = () => {
     if (voiceModeOpenRef.current) return;
+    if (dictationRef.current) {
+      try {
+        dictationRef.current.stop();
+      } catch (e) {}
+      setIsListening(false);
+    }
     voiceModeOpenRef.current = true;
     setIsVoiceModeOpen(true);
     voiceDraftMessageRef.current = false;
@@ -2220,28 +2261,6 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   useEffect(() => {
     voiceStatusRef.current = voiceStatus;
-  }, [voiceStatus]);
-
-  useEffect(() => {
-    if (isVoiceModeOpen) {
-      setTimeout(() => {
-        if (!orbRef.current && document.getElementById("orb-canvas")) {
-          orbRef.current = new OrbController();
-          orbRef.current.setState(voiceStatusRef.current || "idle");
-        }
-      }, 100);
-    } else {
-      if (orbRef.current) {
-        orbRef.current.destroy();
-        orbRef.current = null;
-      }
-    }
-  }, [isVoiceModeOpen]);
-
-  useEffect(() => {
-    if (orbRef.current) {
-      orbRef.current.setState(voiceStatus);
-    }
   }, [voiceStatus]);
 
   // Keep the newest spoken/streamed line visible without moving the orb or
