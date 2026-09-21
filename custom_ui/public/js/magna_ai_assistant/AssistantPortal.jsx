@@ -2025,7 +2025,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
             setTimeout(() => restartRecognition(attempt + 1), 250 * (attempt + 1));
           } else {
             console.warn("[MAGMA VOICE] restart failed after retries:", e);
-            setVoiceError("Microphone stopped listening. Tap Disconnect then Connect to resume.");
+            setVoiceError("Microphone stopped listening. Close voice mode and reopen it to resume.");
           }
         }
       };
