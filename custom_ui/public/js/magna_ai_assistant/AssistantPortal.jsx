@@ -749,6 +749,138 @@ const VoiceMicIcon = ({ muted, color }) => (
   </svg>
 );
 
+// Compact voice dropdown; opens upward so it never covers the input bar.
+const VoicePicker = ({ ttsVoiceKey, ttsVoiceAvailable, onSelectTtsVoice }) => {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const current = TTS_VOICES.find((o) => o.key === ttsVoiceKey) || TTS_VOICES[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.96 }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Assistant voice"
+        title="Assistant voice"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "5px",
+          border:
+            "1px solid color-mix(in srgb, var(--primary-color, #6366f1) 25%, transparent)",
+          borderRadius: "999px",
+          padding: "5px 10px",
+          fontSize: "11px",
+          fontWeight: "650",
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+          color: "var(--primary-color, #6366f1)",
+          backgroundColor:
+            "color-mix(in srgb, var(--primary-color, #6366f1) 8%, transparent)",
+        }}
+      >
+        {current.label}
+        <motion.svg
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.18 }}
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </motion.svg>
+      </motion.button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="listbox"
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: "calc(100% + 8px)",
+              minWidth: "140px",
+              padding: "4px",
+              borderRadius: "12px",
+              zIndex: 20,
+              transformOrigin: "bottom right",
+              background: "var(--card-bg, #ffffff)",
+              border:
+                "1px solid color-mix(in srgb, var(--border-color, rgba(148, 163, 184, 0.4)) 60%, transparent)",
+              boxShadow: "0 12px 28px -10px rgba(0, 0, 0, 0.25)",
+            }}
+          >
+            {TTS_VOICES.map((o) => {
+              const active = o.key === current.key;
+              const available = !!ttsVoiceAvailable?.[o.key];
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  disabled={!available}
+                  title={available ? o.name : `${o.name} is not available in this browser`}
+                  onClick={() => {
+                    onSelectTtsVoice(o.key);
+                    setOpen(false);
+                  }}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "6px 10px",
+                    fontSize: "12px",
+                    fontWeight: active ? "700" : "550",
+                    cursor: available ? "pointer" : "not-allowed",
+                    opacity: available ? 1 : 0.4,
+                    color: active ? "var(--primary-color, #6366f1)" : "var(--text-color, #0f172a)",
+                    backgroundColor: active
+                      ? "color-mix(in srgb, var(--primary-color, #6366f1) 10%, transparent)"
+                      : "transparent",
+                  }}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 // Top-level (not inline) so its identity is stable across re-renders and the orb-canvas doesn't get torn down.
 // Tool activity and the live-typing transcript are already shown in the chat message itself (see handleVoiceEvent) --
 // this widget only needs to show connection status, not duplicate that content.
@@ -844,45 +976,13 @@ const LiveVoiceWidget = ({
               {voiceError}
             </div>
           )}
-          <div
-            role="group"
-            aria-label="Assistant voice"
-            style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginTop: "6px" }}
-          >
-            {TTS_VOICES.map((o) => {
-              const active = ttsVoiceKey === o.key;
-              const available = !!ttsVoiceAvailable?.[o.key];
-              return (
-                <button
-                  key={o.key}
-                  type="button"
-                  aria-pressed={active}
-                  disabled={!available}
-                  onClick={() => onSelectTtsVoice(o.key)}
-                  title={available ? o.name : `${o.name} is not available in this browser`}
-                  style={{
-                    border:
-                      "1px solid color-mix(in srgb, var(--primary-color, #6366f1) " +
-                      (active ? "60%" : "22%") +
-                      ", transparent)",
-                    borderRadius: "999px",
-                    padding: "2px 9px",
-                    fontSize: "10.5px",
-                    fontWeight: "650",
-                    cursor: available ? "pointer" : "not-allowed",
-                    opacity: available ? 1 : 0.4,
-                    color: active ? "#fff" : "var(--primary-color, #6366f1)",
-                    backgroundColor: active
-                      ? "var(--primary-color, #6366f1)"
-                      : "transparent",
-                  }}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
+
+        <VoicePicker
+          ttsVoiceKey={ttsVoiceKey}
+          ttsVoiceAvailable={ttsVoiceAvailable}
+          onSelectTtsVoice={onSelectTtsVoice}
+        />
 
         {voiceConnected && (
           <motion.button
