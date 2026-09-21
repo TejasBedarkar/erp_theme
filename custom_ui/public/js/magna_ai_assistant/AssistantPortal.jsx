@@ -716,6 +716,39 @@ const splitForTts = (text, max = 180) => {
   return out;
 };
 
+const VoiceMicIcon = ({ muted, color }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ display: "block" }}
+    aria-hidden="true"
+  >
+    {muted ? (
+      <>
+        <line x1="2" x2="22" y1="2" y2="22" />
+        <path d="M18.89 13.23A7 7 0 0 0 19 11v-1" />
+        <path d="M5 10v1a7 7 0 0 0 12 0" />
+        <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" />
+        <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
+        <line x1="12" x2="12" y1="19" y2="22" />
+      </>
+    ) : (
+      <>
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+        <line x1="12" x2="12" y1="19" y2="22" />
+      </>
+    )}
+  </svg>
+);
+
 // Top-level (not inline) so its identity is stable across re-renders and the orb-canvas doesn't get torn down.
 // Tool activity and the live-typing transcript are already shown in the chat message itself (see handleVoiceEvent) --
 // this widget only needs to show connection status, not duplicate that content.
@@ -725,6 +758,8 @@ const LiveVoiceWidget = ({
   voiceStatus,
   voiceError,
   voiceConnected,
+  micMuted,
+  toggleMicMute,
   handleOrbTap,
   connectVoice,
   disconnectVoice,
@@ -849,6 +884,33 @@ const LiveVoiceWidget = ({
           </div>
         </div>
 
+        {voiceConnected && (
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={toggleMicMute}
+            title={micMuted ? "Unmute mic" : "Mute mic — stop listening without ending the session"}
+            aria-label={micMuted ? "Unmute mic" : "Mute mic"}
+            style={{
+              border:
+                "1px solid color-mix(in srgb, " + (micMuted ? "#64748b" : "#f59e0b") + " 25%, transparent)",
+              borderRadius: "999px",
+              cursor: "pointer",
+              padding: "7px",
+              flexShrink: 0,
+              color: micMuted ? "#64748b" : "#f59e0b",
+              backgroundColor:
+                "color-mix(in srgb, " + (micMuted ? "#64748b" : "#f59e0b") + " 10%, transparent)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 0,
+            }}
+          >
+            <VoiceMicIcon muted={micMuted} color={micMuted ? "#64748b" : "#f59e0b"} />
+          </motion.button>
+        )}
+
         <motion.button
           whileHover={{ scale: 1.04 }}
           whileTap={{ scale: 0.96 }}
@@ -910,6 +972,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState("idle"); // idle | connecting | listening | thinking | speaking | error
   const [voiceConnected, setVoiceConnected] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const micMutedRef = useRef(false);
   const [micPermission, setMicPermission] = useState("prompt"); // prompt | granted | denied
   const [voiceError, setVoiceError] = useState("");
   const [voiceEvents, setVoiceEvents] = useState([]);
@@ -1726,6 +1790,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
   const connectVoice = async () => {
     if (voiceModeOpenRef.current && voiceConnected) return;
+    micMutedRef.current = false;
+    setMicMuted(false);
 
     // ----------------------------------------------------------------
     // 1. Start SpeechRecognition IMMEDIATELY synchronously.
@@ -1748,6 +1814,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       recognition.maxAlternatives = 3;
 
       recognition.onresult = (event) => {
+        if (micMutedRef.current) return;
         let interim = "";
         let final = "";
 
@@ -1867,7 +1934,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       // that one failed attempt permanently kills listening (the UI still
       // says "Listening..." since that's separate React state).
       const restartRecognition = (attempt = 0) => {
-        if (!voiceModeOpenRef.current || !speechRecognitionRef.current) return;
+        if (!voiceModeOpenRef.current || !speechRecognitionRef.current || micMutedRef.current) return;
         try {
           speechRecognitionRef.current.start();
         } catch (e) {
@@ -1983,6 +2050,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
   };
 
   const disconnectVoice = () => {
+    micMutedRef.current = false;
+    setMicMuted(false);
     stopMicAnalyser();
     if (speechRecognitionRef.current) {
       try {
@@ -2012,6 +2081,31 @@ export default function AssistantPortal({ isOpen, onClose }) {
     setVoiceConnected(false);
     setVoiceStatus("idle");
   };
+  // Mute stops listening and cuts any reply being spoken; the session and socket stay open.
+  const toggleMicMute = () => {
+    const nextMuted = !micMutedRef.current;
+    micMutedRef.current = nextMuted;
+    setMicMuted(nextMuted);
+    const rec = speechRecognitionRef.current;
+    if (nextMuted) {
+      if (ttsSpeakingRef.current) interruptSpeech();
+      setMicLevel(0);
+      try {
+        rec?.stop();
+      } catch (e) {}
+      return;
+    }
+    const resume = (attempt = 0) => {
+      if (micMutedRef.current || !speechRecognitionRef.current) return;
+      try {
+        speechRecognitionRef.current.start();
+      } catch (e) {
+        if (attempt < 5) setTimeout(() => resume(attempt + 1), 250 * (attempt + 1));
+      }
+    };
+    resume();
+  };
+
   const openVoiceMode = () => {
     if (voiceModeOpenRef.current) return;
     voiceModeOpenRef.current = true;
@@ -2096,7 +2190,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const voiceStatusLabel = {
     idle: "Tap Connect to start",
     connecting: "Connecting…",
-    listening: "Listening…",
+    listening: micMuted ? "Mic muted" : "Listening…",
     thinking: "Thinking…",
     speaking: "Speaking…",
     error: "Voice connection error",
@@ -2640,6 +2734,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
                       voiceStatus={voiceStatus}
                       voiceError={voiceError}
                       voiceConnected={voiceConnected}
+                      micMuted={micMuted}
+                      toggleMicMute={toggleMicMute}
                       handleOrbTap={handleOrbTap}
                       connectVoice={connectVoice}
                       disconnectVoice={disconnectVoice}
@@ -2935,6 +3031,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
                         voiceStatus={voiceStatus}
                         voiceError={voiceError}
                         voiceConnected={voiceConnected}
+                        micMuted={micMuted}
+                        toggleMicMute={toggleMicMute}
                         handleOrbTap={handleOrbTap}
                         connectVoice={connectVoice}
                         disconnectVoice={disconnectVoice}
