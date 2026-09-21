@@ -83,6 +83,43 @@ const isLikelyTtsEcho = (candidate, spoken) => {
   return s.includes(c);
 };
 
+// Tool filler phrases the backend speaks (Voice/ws_voice.py), normalized; the mic often re-hears them.
+const ASSISTANT_FILLERS = [
+  "let me search for that", "looking that up online", "extracting their details now",
+  "pulling up their contact info", "looking into their website", "searching for that",
+  "pulling that page up", "one moment", "sending that now", "converting that record now",
+  "setting that up", "setting up those tasks", "reassigning that now", "checking your records",
+  "looking that up in magnaerp", "pulling that record up", "setting that up in magnaerp",
+  "updating that now", "submitting that now", "working on it",
+];
+const ANSWER_START_RE = /^(yes|yeah|yep|yup|ya|ok|okay|sure|please|proceed|go ahead|confirm|approve|no|nope|nah|cancel|stop)\b/;
+const ECHO_COOLDOWN_MS = 650;
+
+// True when what the mic heard is the assistant's own filler or a sentence it just spoke.
+// A spoken answer ("yes please proceed") is never echo, even though the confirmation prompt uses the same words.
+const isAssistantEcho = (transcript, recentPhrases, now = Date.now()) => {
+  const norm = _normalizeForEchoCheck(transcript);
+  if (!norm) return true;
+  if (ANSWER_START_RE.test(norm)) return false;
+  const words = norm.split(" ");
+  for (const filler of ASSISTANT_FILLERS) {
+    if (norm === filler) return true;
+    if (words.length >= 2 && norm.length > 4 && filler.includes(norm)) return true;
+    if (filler.length > 4 && norm.includes(filler)) return true;
+  }
+  if (words.length < 4) return false;
+  for (let i = recentPhrases.length - 1; i >= 0; i--) {
+    const item = recentPhrases[i];
+    if (now - item.time > 12000) continue;
+    const bot = _normalizeForEchoCheck(item.text);
+    if (!bot) continue;
+    if (bot.includes(norm) || (bot.split(" ").length >= 3 && norm.includes(bot))) return true;
+    const botWords = new Set(bot.split(" "));
+    if (words.filter((w) => botWords.has(w)).length / words.length >= 0.75) return true;
+  }
+  return false;
+};
+
 // Helper to resolve current Frappe Desk logged-in user and session cookie (sid)
 let _cachedFrappeContext = null;
 let _resolvingContextPromise = null;
@@ -1117,6 +1154,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const ttsCurrentTextRef = useRef("");
   // No getUserMedia AEC -- used to filter mic-picked-up self-echo of TTS output.
   const recentTtsTextRef = useRef("");
+  const recentBotPhrasesRef = useRef([]);
+  const lastTtsEndTimeRef = useRef(0);
   const recentTtsClearTimerRef = useRef(null);
 
   const activeChat = chatHistory.find((c) => c.id === currentChatId);
@@ -1636,11 +1675,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
       ttsQueueRef.current = [];
       ttsSpeakingRef.current = false;
       ttsCurrentTextRef.current = "";
+      lastTtsEndTimeRef.current = Date.now();
       return;
     }
     if (ttsQueueRef.current.length === 0) {
       ttsSpeakingRef.current = false;
       ttsCurrentTextRef.current = "";
+      lastTtsEndTimeRef.current = Date.now();
       // All speech done — return orb to listening state
       if (voiceModeOpenRef.current) setVoiceStatus("listening");
       // Keep the echo buffer alive briefly after speech ends -- mic
@@ -1685,6 +1726,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       window._activeUtterances = window._activeUtterances.filter(
         (u) => u !== utterance,
       );
+      lastTtsEndTimeRef.current = Date.now();
       if (gen !== ttsGenRef.current) return;
       drainTtsQueue();
     };
@@ -1704,6 +1746,8 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const speakSentence = (text) => {
     const clean = (text || "").trim();
     if (!clean) return;
+    recentBotPhrasesRef.current.push({ text: clean, time: Date.now() });
+    if (recentBotPhrasesRef.current.length > 20) recentBotPhrasesRef.current.shift();
     ttsInterruptedRef.current = false;
     splitForTts(clean).forEach((piece) => ttsQueueRef.current.push(piece));
     if (!ttsSpeakingRef.current) drainTtsQueue();
@@ -1738,6 +1782,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   // (rather than just clearing a queue) guarantees every already-scheduled
   const interruptSpeech = () => {
     console.log("[MAGMA VOICE] interruptSpeech");
+    lastTtsEndTimeRef.current = Date.now();
     ttsGenRef.current += 1;
     ttsInterruptedRef.current = true;
     ttsSpeakingRef.current = false;
@@ -1759,7 +1804,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   // ----------------------------------------------------------------
   // Pure Web Speech API Voice Implementation
   // No getUserMedia is used, as it conflicts with SpeechRecognition on some OS.
-  // Barge-in is triggered instantly by STT interim results.
+  // The assistant is interrupted by tapping the orb, not by speaking over it (no echo cancellation here).
   // ----------------------------------------------------------------
 
   const handleVoiceEvent = (event) => {
@@ -1781,13 +1826,6 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
     if (type === "partial_transcript") {
       setVoiceStatus("listening");
-
-      // Barge-in: STT heard you speak while TTS is playing!
-      if (ttsSpeakingRef.current) {
-        console.log("[MAGMA VOICE] Barge-in via STT interim!");
-        interruptSpeech();
-        voiceSocketRef.current?.send(JSON.stringify({ type: "interrupt" }));
-      }
 
       // Grow a draft user bubble live in chat -- the typing effect comes
       // straight from the real, growing STT text, not a separate preview.
@@ -1931,27 +1969,20 @@ export default function AssistantPortal({ isOpen, onClose }) {
           }
         }
 
+        // While the assistant speaks (and for a moment after) the mic mostly hears the assistant
+        // itself, so nothing is taken as user speech then; tap the orb to interrupt.
+        const assistantSounding =
+          ttsSpeakingRef.current ||
+          Date.now() - lastTtsEndTimeRef.current < ECHO_COOLDOWN_MS;
+
         if (interim) {
           const cleanInterim = interim.trim();
-          if (cleanInterim) {
+          if (
+            cleanInterim &&
+            !assistantSounding &&
+            !isAssistantEcho(cleanInterim, recentBotPhrasesRef.current)
+          ) {
             handleVoiceEvent({ type: "partial_transcript", text: interim });
-            // Barge-in Heuristic: Ignore tiny breathing artifacts < 3 characters,
-            // and ignore the mic picking up the assistant's own TTS output.
-            if (
-              !micMutedRef.current &&
-              ttsSpeakingRef.current &&
-              cleanInterim.length > 2 &&
-              !isLikelyTtsEcho(cleanInterim, recentTtsTextRef.current)
-            ) {
-              console.log(
-                "[MAGMA VOICE] Barge-in via STT interim!",
-                cleanInterim,
-              );
-              interruptSpeech();
-              voiceSocketRef.current?.send(
-                JSON.stringify({ type: "interrupt" }),
-              );
-            }
           }
         }
         if (final) {
@@ -1974,9 +2005,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
           // The mic (no echo cancellation) can pick up the assistant's own
           // recently-spoken TTS output and misreport it as new user speech.
-          if (isLikelyTtsEcho(cleanText, recentTtsTextRef.current)) {
+          if (
+            assistantSounding ||
+            isAssistantEcho(cleanText, recentBotPhrasesRef.current) ||
+            isLikelyTtsEcho(cleanText, recentTtsTextRef.current)
+          ) {
             console.log(
-              "[MAGMA VOICE] Ignored likely TTS self-echo:",
+              "[MAGMA VOICE] Ignored assistant self-echo:",
               cleanText,
             );
             return;
