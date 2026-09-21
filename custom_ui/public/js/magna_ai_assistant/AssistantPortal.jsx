@@ -887,18 +887,29 @@ const VoicePicker = ({ ttsVoiceKey, ttsVoiceAvailable, onSelectTtsVoice }) => {
 const LiveVoiceWidget = ({
   isVoiceModeOpen,
   voiceStatusLabel,
+  voiceStatusHint,
   voiceStatus,
   voiceError,
   voiceConnected,
   micMuted,
-  toggleMicMute,
   handleOrbTap,
-  connectVoice,
-  disconnectVoice,
+  toggleMicMute,
   ttsVoiceKey,
   ttsVoiceAvailable,
   onSelectTtsVoice,
-}) => (
+}) => {
+  const muteTitle = micMuted
+    ? "Unmute mic"
+    : "Mute mic — stop capturing without ending the session";
+  const accent = micMuted ? "#64748b" : "#f59e0b";
+  const statusColor =
+    voiceStatus === "speaking"
+      ? "var(--primary-color, #6366f1)"
+      : voiceStatus === "thinking"
+        ? "var(--primary-color, #6366f1)"
+        : "var(--text-color, #0f172a)";
+
+  return (
   <AnimatePresence>
     {isVoiceModeOpen && (
       <motion.div
@@ -926,7 +937,7 @@ const LiveVoiceWidget = ({
       >
         <div
           className={
-            voiceStatus === "speaking"
+            voiceStatus === "speaking" || voiceStatus === "thinking"
               ? "magna-orb-wrap magna-orb-speaking"
               : "magna-orb-wrap"
           }
@@ -956,24 +967,21 @@ const LiveVoiceWidget = ({
             style={{
               fontSize: "13px",
               fontWeight: "650",
-              color:
-                voiceStatus === "speaking"
-                  ? "var(--primary-color, #6366f1)"
-                  : "var(--text-color, #0f172a)",
+              color: statusColor,
             }}
           >
             {voiceError ? "Error" : voiceStatusLabel}
           </div>
-          {voiceError && (
+          {(voiceStatusHint || voiceError) && (
             <div
               style={{
                 fontSize: "11px",
-                color: "#ef4444",
+                color: voiceError ? "#ef4444" : "var(--text-muted, #64748b)",
                 marginTop: "1px",
                 lineHeight: 1.4,
               }}
             >
-              {voiceError}
+              {voiceError || voiceStatusHint}
             </div>
           )}
         </div>
@@ -989,57 +997,32 @@ const LiveVoiceWidget = ({
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             onClick={toggleMicMute}
-            title={micMuted ? "Unmute mic" : "Mute mic — stop listening without ending the session"}
-            aria-label={micMuted ? "Unmute mic" : "Mute mic"}
+            title={muteTitle}
+            aria-label={muteTitle}
             style={{
               border:
-                "1px solid color-mix(in srgb, " + (micMuted ? "#64748b" : "#f59e0b") + " 25%, transparent)",
+                "1px solid color-mix(in srgb, " + accent + " 25%, transparent)",
               borderRadius: "999px",
               cursor: "pointer",
               padding: "7px",
               flexShrink: 0,
-              color: micMuted ? "#64748b" : "#f59e0b",
+              color: accent,
               backgroundColor:
-                "color-mix(in srgb, " + (micMuted ? "#64748b" : "#f59e0b") + " 10%, transparent)",
+                "color-mix(in srgb, " + accent + " 10%, transparent)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
               lineHeight: 0,
             }}
           >
-            <VoiceMicIcon muted={micMuted} color={micMuted ? "#64748b" : "#f59e0b"} />
+            <VoiceMicIcon muted={micMuted} color={accent} />
           </motion.button>
         )}
-
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={voiceConnected ? disconnectVoice : connectVoice}
-          title={voiceConnected ? "Disconnect" : "Connect"}
-          style={{
-            border:
-              "1px solid color-mix(in srgb, " +
-              (voiceConnected ? "#f59e0b" : "var(--primary-color, #6366f1)") +
-              " 25%, transparent)",
-            borderRadius: "999px",
-            cursor: "pointer",
-            padding: "6px 13px",
-            flexShrink: 0,
-            fontSize: "11px",
-            fontWeight: "700",
-            color: voiceConnected ? "#f59e0b" : "var(--primary-color, #6366f1)",
-            backgroundColor:
-              "color-mix(in srgb, " +
-              (voiceConnected ? "#f59e0b" : "var(--primary-color, #6366f1)") +
-              " 10%, transparent)",
-          }}
-        >
-          {voiceConnected ? "Disconnect" : "Connect"}
-        </motion.button>
       </motion.div>
     )}
   </AnimatePresence>
-);
+  );
+};
 
 export default function AssistantPortal({ isOpen, onClose }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -2288,13 +2271,21 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const activeSessionLabel = activeChat ? activeChat.title : "New session";
 
   const voiceStatusLabel = {
-    idle: "Tap Connect to start",
+    idle: "Starting…",
     connecting: "Connecting…",
-    listening: micMuted ? "Mic muted" : "Listening…",
-    thinking: "Thinking…",
+    listening: "Listening…",
+    thinking: "Working on your request…",
     speaking: "Speaking…",
     error: "Voice connection error",
   }[voiceStatus];
+
+  const voiceStatusHint = micMuted
+    ? "Mic muted — unmute when you want to talk"
+    : voiceStatus === "thinking"
+      ? "Searching and updating ERP…"
+      : voiceStatus === "speaking"
+        ? "Tap the orb to interrupt"
+        : "";
 
   // Animated File Badges Component
   const RenderFileBadges = () => {
@@ -2831,14 +2822,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
                     <LiveVoiceWidget
                       isVoiceModeOpen={isVoiceModeOpen}
                       voiceStatusLabel={voiceStatusLabel}
+                      voiceStatusHint={voiceStatusHint}
                       voiceStatus={voiceStatus}
                       voiceError={voiceError}
                       voiceConnected={voiceConnected}
                       micMuted={micMuted}
-                      toggleMicMute={toggleMicMute}
                       handleOrbTap={handleOrbTap}
-                      connectVoice={connectVoice}
-                      disconnectVoice={disconnectVoice}
+                      toggleMicMute={toggleMicMute}
                       ttsVoiceKey={ttsVoiceKey}
                       ttsVoiceAvailable={ttsVoiceAvailable}
                       onSelectTtsVoice={selectTtsVoice}
@@ -3128,14 +3118,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
                       <LiveVoiceWidget
                         isVoiceModeOpen={isVoiceModeOpen}
                         voiceStatusLabel={voiceStatusLabel}
+                        voiceStatusHint={voiceStatusHint}
                         voiceStatus={voiceStatus}
                         voiceError={voiceError}
                         voiceConnected={voiceConnected}
                         micMuted={micMuted}
-                        toggleMicMute={toggleMicMute}
                         handleOrbTap={handleOrbTap}
-                        connectVoice={connectVoice}
-                        disconnectVoice={disconnectVoice}
+                        toggleMicMute={toggleMicMute}
                         ttsVoiceKey={ttsVoiceKey}
                         ttsVoiceAvailable={ttsVoiceAvailable}
                         onSelectTtsVoice={selectTtsVoice}
