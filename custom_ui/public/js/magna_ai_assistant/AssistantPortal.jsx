@@ -1897,7 +1897,6 @@ export default function AssistantPortal({ isOpen, onClose }) {
       recognition.maxAlternatives = 3;
 
       recognition.onresult = (event) => {
-        if (micMutedRef.current) return;
         let interim = "";
         let final = "";
 
@@ -1916,6 +1915,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
             // Barge-in Heuristic: Ignore tiny breathing artifacts < 3 characters,
             // and ignore the mic picking up the assistant's own TTS output.
             if (
+              !micMutedRef.current &&
               ttsSpeakingRef.current &&
               cleanInterim.length > 2 &&
               !isLikelyTtsEcho(cleanInterim, recentTtsTextRef.current)
@@ -2164,14 +2164,13 @@ export default function AssistantPortal({ isOpen, onClose }) {
     setVoiceConnected(false);
     setVoiceStatus("idle");
   };
-  // Mute stops listening and cuts any reply being spoken; the session and socket stay open.
+  // Mute only stops listening (a phrase already in flight still goes through); the reply keeps speaking.
   const toggleMicMute = () => {
     const nextMuted = !micMutedRef.current;
     micMutedRef.current = nextMuted;
     setMicMuted(nextMuted);
     const rec = speechRecognitionRef.current;
     if (nextMuted) {
-      if (ttsSpeakingRef.current) interruptSpeech();
       setMicLevel(0);
       try {
         rec?.stop();
@@ -2280,7 +2279,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
   }[voiceStatus];
 
   const voiceStatusHint = micMuted
-    ? "Mic muted — unmute when you want to talk"
+    ? voiceStatus === "thinking" || voiceStatus === "speaking"
+      ? "Mic muted — reply continues. Unmute to interrupt."
+      : "Mic muted — unmute when you want to talk"
     : voiceStatus === "thinking"
       ? "Searching and updating ERP…"
       : voiceStatus === "speaking"
