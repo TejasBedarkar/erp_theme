@@ -1125,6 +1125,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
   const voiceChatIdRef = useRef(null);
   const pendingVoiceTextRef = useRef([]);
   const recognitionRunningRef = useRef(false);
+  const recognitionRestartInFlightRef = useRef(false);
   // Tracks whether the current user turn already has a growing draft
   // bubble in chat (interim STT results update it live) or needs one.
   const voiceDraftMessageRef = useRef(false);
@@ -2054,6 +2055,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
 
       recognition.onstart = () => {
         recognitionRunningRef.current = true;
+        recognitionRestartInFlightRef.current = false;
       };
       recognition.onaudiostart = () => setMicLevel(0.4);
       recognition.onsoundstart = () => setMicLevel(0.7);
@@ -2069,28 +2071,9 @@ export default function AssistantPortal({ isOpen, onClose }) {
         }
       };
 
-      // .start() called right inside .onend can throw a transient
-      // InvalidStateError before the browser's recognition service has
-      // fully released the previous session -- without a retry here,
-      // that one failed attempt permanently kills listening (the UI still
-      // says "Listening..." since that's separate React state).
-      const restartRecognition = (attempt = 0) => {
-        if (!voiceModeOpenRef.current || !speechRecognitionRef.current || micMutedRef.current) return;
-        try {
-          speechRecognitionRef.current.start();
-        } catch (e) {
-          if (attempt < 5) {
-            setTimeout(() => restartRecognition(attempt + 1), 250 * (attempt + 1));
-          } else {
-            console.warn("[MAGMA VOICE] restart failed after retries:", e);
-            setVoiceError("Microphone stopped listening. Close voice mode and reopen it to resume.");
-          }
-        }
-      };
-
       recognition.onend = () => {
         recognitionRunningRef.current = false;
-        if (speechRecognitionRef.current === recognition) restartRecognition();
+        if (speechRecognitionRef.current === recognition) attemptStartRecognition();
       };
 
       speechRecognitionRef.current = recognition;
@@ -2235,6 +2218,30 @@ export default function AssistantPortal({ isOpen, onClose }) {
     setVoiceConnected(false);
     setVoiceStatus("idle");
   };
+  // .start() called right after an .onend (a restart, or right after unmuting) can throw a
+  // transient InvalidStateError before the browser's recognition service has fully released
+  // the previous session. This is the ONE place that retries it -- both the natural restart
+  // (recognition.onend) and unmuting call this same function, so they can never race each
+  // other over the same recognition object (they used to be two separate retry loops).
+  const attemptStartRecognition = (attempt = 0) => {
+    if (!voiceModeOpenRef.current || !speechRecognitionRef.current || micMutedRef.current) return;
+    if (recognitionRunningRef.current) return; // already running -- nothing to do
+    if (attempt === 0 && recognitionRestartInFlightRef.current) return; // a retry chain is already in progress
+    recognitionRestartInFlightRef.current = true;
+    try {
+      speechRecognitionRef.current.start();
+      // onstart clears recognitionRestartInFlightRef once the browser confirms it's live
+    } catch (e) {
+      if (attempt < 5) {
+        setTimeout(() => attemptStartRecognition(attempt + 1), 250 * (attempt + 1));
+      } else {
+        recognitionRestartInFlightRef.current = false;
+        console.warn("[MAGMA VOICE] restart failed after retries:", e);
+        setVoiceError("Microphone stopped listening. Close voice mode and reopen it to resume.");
+      }
+    }
+  };
+
   // Mute only stops listening (a phrase already in flight still goes through); the reply keeps speaking.
   const toggleMicMute = () => {
     const nextMuted = !micMutedRef.current;
@@ -2248,15 +2255,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
       } catch (e) {}
       return;
     }
-    const resume = (attempt = 0) => {
-      if (micMutedRef.current || !speechRecognitionRef.current) return;
-      try {
-        speechRecognitionRef.current.start();
-      } catch (e) {
-        if (attempt < 5) setTimeout(() => resume(attempt + 1), 250 * (attempt + 1));
-      }
-    };
-    resume();
+    attemptStartRecognition();
   };
 
   const openVoiceMode = () => {
