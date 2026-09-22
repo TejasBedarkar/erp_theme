@@ -71,16 +71,49 @@ const _normalizeForEchoCheck = (value = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-// True when `candidate` (what the mic just heard) looks like the mic picking
-// up `spoken` (what the assistant itself just said) rather than real user
-// speech. Only flags multi-word matches so short replies like "yes"/"ok"
-// always pass through untouched.
+// The assistant's own short filler lines (Voice/ws_voice.py's _TOOL_FILLER_PHRASES /
+// _ERP_OP_FILLERS / _DEFAULT_FILLER) -- worth matching even at 1-2 words, since the
+// mic often only catches a fragment of one ("...records." / "one moment").
+const ASSISTANT_FILLER_PHRASES = [
+  "let me search for that", "looking that up online", "extracting their details now",
+  "pulling up their contact info", "looking into their website", "searching for that",
+  "pulling that page up", "one moment", "sending that now", "converting that record now",
+  "setting that up", "setting up those tasks", "reassigning that now", "checking your records",
+  "looking that up in magnaerp", "pulling that record up", "setting that up in magnaerp",
+  "updating that now", "submitting that now", "working on it",
+];
+// A short deliberate reply/interrupt must always get through, even if it happens to
+// share a word with what was just spoken (e.g. "yes" after a proposal, or "stop").
+const _ECHO_ANSWER_RE = /^(yes|yeah|yep|yup|ya|ok|okay|sure|please|proceed|go ahead|confirm|approve|no|nope|nah|cancel|stop|wait)/;
+
+// True when `candidate` (what the mic just heard) looks like the mic picking up the
+// assistant's own voice -- a filler line, or a recently-spoken sentence -- rather than
+// real user speech.
 const isLikelyTtsEcho = (candidate, spoken) => {
   const c = _normalizeForEchoCheck(candidate);
   const s = _normalizeForEchoCheck(spoken);
-  if (!c || !s) return false;
-  if (c.split(" ").filter(Boolean).length < 3) return false;
-  return s.includes(c);
+  if (!c) return false;
+  if (_ECHO_ANSWER_RE.test(c)) return false;
+  const cWords = c.split(" ").filter(Boolean);
+
+  // 1. Fillers are a small, fixed vocabulary -- safe to match at any length.
+  for (const filler of ASSISTANT_FILLER_PHRASES) {
+    if (c === filler) return true;
+    if (cWords.length >= 2 && c.length > 4 && filler.includes(c)) return true;
+    if (filler.length > 4 && c.includes(filler)) return true;
+  }
+  if (!s) return false;
+
+  // 2. Exact fragment of what was just said -- catches a clipped tail ("your records"
+  //    picked up from "...checking your records"). A single common word (its own
+  //    match here would falsely catch a real one-word reply) still needs 2+ words.
+  if (cWords.length >= 2 && s.includes(c)) return true;
+
+  // 3. Garbled ASR of a longer sentence -- only judged once there are enough words
+  //    to be a confident signal, so a short real reply sharing one word never matches.
+  if (cWords.length < 4) return false;
+  const sWords = new Set(s.split(" ").filter(Boolean));
+  return cWords.filter((w) => sWords.has(w)).length / cWords.length >= 0.75;
 };
 
 // Helper to resolve current Frappe Desk logged-in user and session cookie (sid)
@@ -1658,6 +1691,7 @@ export default function AssistantPortal({ isOpen, onClose }) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
+    utterance.volume = 0.9; // slightly softer -- less speaker output for the mic to pick back up
     const voice = pickTtsVoice();
     // Match lang to the chosen voice -- forcing en-IN while using a US
     // voice like Samantha makes some browsers ignore the voice choice.
